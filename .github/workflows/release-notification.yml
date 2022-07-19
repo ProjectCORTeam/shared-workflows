@@ -27,7 +27,7 @@ jobs:
                       "bottomLabel": "",
                       "onClick": {
                             "openLink": {
-                              "url": "https://www.google.com/search?q=hello+world"
+                              "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
                             }
                         },
                       "icon": "DESCRIPTION"
