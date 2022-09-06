@@ -1,0 +1,231 @@
+name: AWS Build
+
+on: 
+  workflow_call:
+    inputs: 
+      runner:
+        required: false
+        type: string
+        default: 'ubuntu-latest'
+      env_check:
+        required: true
+        type: string
+        description: "Environment status checker"
+      new_stage:
+        required: false
+        type: string
+        description: "New stage for deploy check flag"
+        default: "false"
+      stage:
+        required: true
+        type: string
+        description: "Stage name for infrastructure deployment"
+      release_version:
+        required: true
+        type: string
+        description: "Semantic versioning for production environment"
+      notifications:
+        required: false
+        type: boolean
+        default: true
+        description: "Enable notifications to cloud or team owner flag"
+    secrets: 
+      CODEBUILD_PROJECT_PROD:
+        required: true
+      CODEBUILD_PROJECT_STAGING:
+        required: true
+      CICD_AWS_ACCESS_KEY_ID:
+        required: true
+      CICD_AWS_SECRET_ACCESS_KEY:
+        required: true
+      CICD_AWS_REGION:
+        required: true
+      GOOGLE_WEBHOOK:
+        required: true
+      TF_API_TOKEN:
+        required: true
+      ACTIONS_TOKEN:
+        required: true
+
+jobs:
+  terraform:
+      name: "Terraform"
+      runs-on: ${{ inputs.runner }}
+      steps:
+        - name: Checkout
+          uses: actions/checkout@v3
+
+        - name: Input preprocessing
+          shell: bash
+          working-directory: .infra/terraform
+          run: |
+            if [[ ${{inputs.stage}} == "master" ]]; \
+            then \
+            echo "STAGE=production" >> $GITHUB_ENV; \
+            else \
+            echo "STAGE=${{inputs.stage}}" >> $GITHUB_ENV ; \
+            fi
+
+        - name: Input checks
+          shell: bash
+          working-directory: .infra/terraform
+          run: |
+            echo "runner: "${{ inputs.runner }}
+            echo "env_check: "${{inputs.env_check}}
+            echo "new_stage: "${{ inputs.new_stage }}
+            echo "stage: "${{env.STAGE}}
+            echo "release_version: "${{inputs.release_version}}
+
+        - name: Generate terraform.auto.tfvars for new environment
+          if:  ${{ inputs.new_stage == 'true' }}
+          id: tfvars_generator_new
+          shell: bash
+          working-directory: .infra/terraform
+          run: |
+            if [ ${{env.STAGE}} == 'production' ]; then \
+              jq --argjson new_env ${{ inputs.new_stage }} '(.env_settings[]) += {new_env: $new_env}' terraform.auto.tfvars.json.tpl  | jq --arg version ${{inputs.release_version}} '(.env_settings[] | select(.stage == "production")) += {release_version: $version}'  > terraform.auto.tfvars.json;\
+            elif [ ${{env.STAGE}} == 'beta' ]; then \
+              jq --argjson new_env ${{ inputs.new_stage }} '(.env_settings[]) += {new_env: $new_env}' terraform.auto.tfvars.json.tpl  | jq --arg version ${{inputs.release_version}} '(.env_settings[] | select(.stage == "beta")) += {release_version: $version}'  > terraform.auto.tfvars.json ;\
+            else \
+              jq --argjson new_env ${{ inputs.new_stage }} '(.env_settings[]) += {new_env: $new_env}' terraform.auto.tfvars.json.tpl  > terraform.auto.tfvars.json ; \
+            fi
+            terraform fmt
+            cat terraform.auto.tfvars.json
+
+        - name: Generate terraform.auto.tfvars for existing environment
+          if:  ${{ inputs.new_stage != 'false'}}
+          id: tfvars_generator_existing
+          shell: bash
+          working-directory: .infra/terraform
+          run: |
+            echo "Release version: "${{inputs.release_version}}
+            if [ ${{env.STAGE}} == 'production' ]; then \
+              jq --argjson new_env ${{ inputs.new_stage }} '(.env_settings[]) += {new_env: $new_env}' terraform.auto.tfvars.json.tpl  | jq --arg version ${{inputs.release_version}} '(.env_settings[] | select(.stage == "production")) += {release_version: $version}'  > terraform.auto.tfvars.json ; \
+            elif [ ${{env.STAGE}} == 'beta' ]; then \
+              jq --argjson new_env ${{ inputs.new_stage }} '(.env_settings[]) += {new_env: $new_env}' terraform.auto.tfvars.json.tpl  | jq --arg version ${{inputs.release_version}} '(.env_settings[] | select(.stage == "beta")) += {release_version: $version}'  > terraform.auto.tfvars.json ; \
+            else \
+              jq --argjson new_env ${{ inputs.new_stage }} '(.env_settings[]) += {new_env: $new_env}' terraform.auto.tfvars.json.tpl  > terraform.auto.tfvars.json ; \
+            fi
+            terraform fmt
+            cat terraform.auto.tfvars.json
+
+        - name: Setup Terraform
+          uses: hashicorp/setup-terraform@v1
+          with:
+            # terraform_version: 0.13.0:
+            cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+
+        - name: Terraform Format
+          id: fmt
+          run: terraform fmt -check -recursive -diff
+          working-directory: .infra/terraform
+
+        - name: Terraform Init
+          id: init
+          run: terraform init
+          working-directory: .infra/terraform
+        
+        - name: Terraform Validate
+          id: validate
+          run: terraform validate -no-color
+          working-directory: .infra/terraform
+
+        - name: Terraform Plan Staging
+          id: plan-staging
+          if: github.event_name == 'pull_request' && contains( github.base_ref, 'staging' )
+          run: terraform plan -no-color -input=false -target='module.shared' -target='module.staging'
+          continue-on-error: true
+          working-directory: .infra/terraform
+
+        - uses: actions/github-script@v6
+          if: github.event_name == 'pull_request' && contains( github.base_ref, 'staging' )
+          env:
+            PLAN: "terraform\n${{ steps.plan-staging.outputs.stdout }}"
+          with:
+            github-token: ${{ secrets.ACTIONS_TOKEN }}
+            script: |
+              const output = `#### Terraform Format and Style 🖌\`${{ steps.fmt.outcome }}\`
+              #### Terraform Initialization ⚙️\`${{ steps.init.outcome }}\`
+              #### Terraform Validation 🤖\`${{ steps.validate.outcome }}\`
+              #### Terraform Plan 📖\`${{ steps.plan-staging.outcome }}\`
+              <details><summary>Show Plan</summary>
+              \`\`\`\n
+              ${process.env.PLAN}
+              \`\`\`
+              </details>
+              *Pushed by: @${{ github.actor }}, Action: \`${{ github.event_name }}\`*`;
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: output
+              })
+        
+        - name: Terraform Plan Staging Status
+          if: steps.plan-staging.outcome == 'failure'
+          run: exit 1
+        
+        - name: Terraform Apply Staging
+          if: github.event_name == 'push' && contains(github.ref, 'staging')
+          id: infra-apply-staging
+          run: terraform apply -auto-approve -input=false -target='module.shared' -target='module.staging["${{ env.STAGE }}"]'
+          working-directory: .infra/terraform
+
+        - name: Google Chat Notification - Staging
+          if: github.event_name == 'push' && contains(github.ref, 'staging')
+          uses: nakamuraos/google-chat-notifications@v2.0.1
+          with:
+            title: Infrastructure Apply
+            subtitle: Staging - ${{ env.STAGE }}
+            webhookUrl: ${{ secrets.GOOGLE_WEBHOOK }}
+            status: ${{ steps.infra-apply-staging.outcome }}
+
+        - name: Terraform Plan Prod
+          if: github.event_name == 'pull_request' && contains( github.base_ref, 'master' ) || contains( github.base_ref, 'beta' ) && ${{ inputs.notifications }}
+          id: plan-prod
+          run: terraform plan -no-color -input=false -target='module.shared' -target='module.prod'
+          continue-on-error: true
+          working-directory: .infra/terraform
+
+        - uses: actions/github-script@v6
+          if: github.event_name == 'pull_request' && contains( github.base_ref, 'master' ) || contains( github.base_ref, 'beta' )
+          env:
+            PLAN: "terraform\n${{ steps.plan-prod.outputs.stdout }}"
+          with:
+            github-token: ${{ secrets.ACTIONS_TOKEN }}
+            script: |
+              const output = `#### Terraform Format and Style 🖌\`${{ steps.fmt.outcome }}\`
+              #### Terraform Initialization ⚙️\`${{ steps.init.outcome }}\`
+              #### Terraform Validation 🤖\`${{ steps.validate.outcome }}\`
+              #### Terraform Plan 📖\`${{ steps.plan-prod.outcome }}\`
+              <details><summary>Show Plan</summary>
+              \`\`\`\n
+              ${process.env.PLAN}
+              \`\`\`
+              </details>
+              *Pushed by: @${{ github.actor }}, Action: \`${{ github.event_name }}\`*`;
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: output
+              })
+        
+        - name: Terraform Plan Prod Status
+          if: steps.plan-prod.outcome == 'failure'
+          run: exit 1
+
+        - name: Terraform Apply Prod
+          if: github.event_name == 'release'
+          id: infra-apply-production
+          run: terraform apply -auto-approve -input=false -target='module.shared' -target='module.prod["${{ env.STAGE }}"]'
+          working-directory: .infra/terraform
+
+        - name: Google Chat Notification - Production
+          if: github.event_name == 'release' 
+          uses: nakamuraos/google-chat-notifications@v2.0.1
+          with:
+            title: Infrastructure Apply
+            subtitle: ${{ env.STAGE }}
+            webhookUrl: ${{ secrets.GOOGLE_WEBHOOK }}
+            status: ${{ steps.infra-apply-production.outcome }}
