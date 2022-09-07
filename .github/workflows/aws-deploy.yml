@@ -80,34 +80,34 @@ jobs:
           if:  ${{ inputs.new_stage == 'true' }}
           id: tfvars_generator_new
           shell: bash
-          working-directory: .infra/terraform
+          working-directory: .infra
           run: |
             if [ ${{env.STAGE}} == 'production' ]; then \
-              jq --argjson new_env ${{ inputs.new_stage }} '(.env_settings[]) += {new_env: $new_env}' terraform.auto.tfvars.json.tpl  | jq --arg version ${{inputs.release_version}} '(.env_settings[] | select(.stage == "production")) += {release_version: $version}'  > terraform.auto.tfvars.json;\
+              jq --argjson new_env ${{ inputs.new_stage }} '(.env_settings[]) += {new_env: $new_env}' infra-config.json  | jq --arg version ${{inputs.release_version}} '(.env_settings[] | select(.stage == "production")) += {release_version: $version}'  > ./terraform/terraform.auto.tfvars.json;\
             elif [ ${{env.STAGE}} == 'beta' ]; then \
-              jq --argjson new_env ${{ inputs.new_stage }} '(.env_settings[]) += {new_env: $new_env}' terraform.auto.tfvars.json.tpl  | jq --arg version ${{inputs.release_version}} '(.env_settings[] | select(.stage == "beta")) += {release_version: $version}'  > terraform.auto.tfvars.json ;\
+              jq --argjson new_env ${{ inputs.new_stage }} '(.env_settings[]) += {new_env: $new_env}' infra-config.json  | jq --arg version ${{inputs.release_version}} '(.env_settings[] | select(.stage == "beta")) += {release_version: $version}'  > ./terraform/terraform.auto.tfvars.json ;\
             else \
-              jq --argjson new_env ${{ inputs.new_stage }} '(.env_settings[]) += {new_env: $new_env}' terraform.auto.tfvars.json.tpl  > terraform.auto.tfvars.json ; \
+              jq --argjson new_env ${{ inputs.new_stage }} '(.env_settings[]) += {new_env: $new_env}' infra-config.json  > ./terraform/terraform.auto.tfvars.json ; \
             fi
             terraform fmt
-            cat terraform.auto.tfvars.json
+            cat ./terraform/terraform.auto.tfvars.json
 
         - name: Generate terraform.auto.tfvars for existing environment
           if:  ${{ inputs.new_stage != 'false'}}
           id: tfvars_generator_existing
           shell: bash
-          working-directory: .infra/terraform
+          working-directory: .infra
           run: |
             echo "Release version: "${{inputs.release_version}}
             if [ ${{env.STAGE}} == 'production' ]; then \
-              jq --argjson new_env ${{ inputs.new_stage }} '(.env_settings[]) += {new_env: $new_env}' terraform.auto.tfvars.json.tpl  | jq --arg version ${{inputs.release_version}} '(.env_settings[] | select(.stage == "production")) += {release_version: $version}'  > terraform.auto.tfvars.json ; \
+              jq --argjson new_env ${{ inputs.new_stage }} '(.env_settings[]) += {new_env: $new_env}' infra-config.json  | jq --arg version ${{inputs.release_version}} '(.env_settings[] | select(.stage == "production")) += {release_version: $version}'  > ./terraform/terraform.auto.tfvars.json ; \
             elif [ ${{env.STAGE}} == 'beta' ]; then \
-              jq --argjson new_env ${{ inputs.new_stage }} '(.env_settings[]) += {new_env: $new_env}' terraform.auto.tfvars.json.tpl  | jq --arg version ${{inputs.release_version}} '(.env_settings[] | select(.stage == "beta")) += {release_version: $version}'  > terraform.auto.tfvars.json ; \
+              jq --argjson new_env ${{ inputs.new_stage }} '(.env_settings[]) += {new_env: $new_env}' infra-config.json  | jq --arg version ${{inputs.release_version}} '(.env_settings[] | select(.stage == "beta")) += {release_version: $version}'  > ./terraform/terraform.auto.tfvars.json ; \
             else \
-              jq --argjson new_env ${{ inputs.new_stage }} '(.env_settings[]) += {new_env: $new_env}' terraform.auto.tfvars.json.tpl  > terraform.auto.tfvars.json ; \
+              jq --argjson new_env ${{ inputs.new_stage }} '(.env_settings[]) += {new_env: $new_env}' infra-config.json  > ./terraform/terraform.auto.tfvars.json ; \
             fi
             terraform fmt
-            cat terraform.auto.tfvars.json
+            cat ./terraform/terraform.auto.tfvars.json
 
         - name: Setup Terraform
           uses: hashicorp/setup-terraform@v1
