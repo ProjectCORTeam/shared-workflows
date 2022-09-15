@@ -181,7 +181,7 @@ jobs:
             status: ${{ steps.infra-apply-staging.outcome }}
 
         - name: Terraform Plan Prod
-          if: github.event_name == 'pull_request' && contains( github.base_ref, 'master' ) || contains( github.base_ref, 'beta' ) && ${{ inputs.notifications }}
+          if: github.event_name == 'pull_request' && contains( github.base_ref, 'master' ) || contains( github.base_ref, 'beta' )
           id: plan-prod
           run: terraform plan -no-color -input=false -target='module.shared' -target='module.prod'
           continue-on-error: true
