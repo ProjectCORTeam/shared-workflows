@@ -118,7 +118,8 @@ jobs:
           elif [[ $BRANCH_NAME == "beta" && ${{ secrets.CODEBUILD_PROJECT_PROD != ''}} ]];\
           then \
           echo "PROJECT=$(echo ${{secrets.CODEBUILD_PROJECT_PROD}}-beta)" >> $GITHUB_ENV; \
-          elif [[ ${{ secrets.CODEBUILD_PROJECT_STAGING != ''}} ]];\ \
+          elif [[ ${{ secrets.CODEBUILD_PROJECT_STAGING != ''}} ]];\
+          then \
           echo "PROJECT=$(echo ${{secrets.CODEBUILD_PROJECT_STAGING}}-$BRANCH_NAME)" >> $GITHUB_ENV; \
           else \
           echo "PROJECT=NONE_PROJECTS" >> $GITHUB_ENV; \
