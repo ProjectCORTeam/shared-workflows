@@ -115,21 +115,21 @@ jobs:
           if [[ $BRANCH_NAME == "master" && ${{ secrets.CODEBUILD_PROJECT_PROD != ''}} == 'true' ]]; \
           then \
           echo "PROJECT=$(echo ${{secrets.CODEBUILD_PROJECT_PROD}}-production)" >> $GITHUB_ENV; \
-          echo "::set-output name=project_exist::'true'" \
+          echo "::set-output name=project_exist::'true'"; \
           echo "::set-output name=new_stage::'false'"; \
           elif [[ $BRANCH_NAME == "beta" && ${{ secrets.CODEBUILD_PROJECT_PROD != ''}} == 'true' ]];\
           then \
           echo "PROJECT=$(echo ${{secrets.CODEBUILD_PROJECT_PROD}}-beta)" >> $GITHUB_ENV; \
-          echo "::set-output name=project_exist::'true'" \
+          echo "::set-output name=project_exist::'true'"; \
           echo "::set-output name=new_stage::'false'"; \
           elif [[ ${{ secrets.CODEBUILD_PROJECT_STAGING != ''}} == 'true' ]];\
           then \
           echo "PROJECT=$(echo ${{secrets.CODEBUILD_PROJECT_STAGING}}-$BRANCH_NAME)" >> $GITHUB_ENV; \
-          echo "::set-output name=project_exist::'true'" \
+          echo "::set-output name=project_exist::'true'"; \
           echo "::set-output name=new_stage::'false'"; \
           else \
           echo "PROJECT=NONE_PROJECTS" >> $GITHUB_ENV; \
-          echo "::set-output name=project_exist::'false'" \
+          echo "::set-output name=project_exist::'false'"; \
           echo "::set-output name=new_stage::'true'"; \
           fi
           echo "::set-output name=stage::$BRANCH_NAME"
