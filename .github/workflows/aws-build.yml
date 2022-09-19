@@ -143,13 +143,7 @@ jobs:
           PROJECT_EXIST=$(aws codebuild list-projects --region ${{ secrets.CICD_AWS_REGION }} --query 'projects[?contains(@,`${{ env.PROJECT }}`) == `true`]' | jq -e 'length > 0')
           echo "Project exist: "$PROJECT_EXIST
           echo "::set-output name=project_exist::$PROJECT_EXIST"
-          if [[ $PROJECT_EXIST == "true" ]]; \
-          then \
-            echo "::set-output name=new_stage::'false'"; \
-          elif [[ $PROJECT_EXIST == "false" ]]; \
-          then \
-            echo "::set-output name=new_stage::'true'"; \
-          fi
+          echo "::set-output name=new_stage::'true'"; \
         
       - name: Run AWS CodeBuild
         id: codebuild
