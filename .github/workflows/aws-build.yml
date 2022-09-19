@@ -140,6 +140,7 @@ jobs:
         id: check-project
         shell: bash
         run: |
+          aws codebuild list-projects --region us-east-1 --profile cor-cicd --query 'projects[?contains(@,`NONE_PROJECTS`) == `true`]'
           echo "::set-output name=project_exist::'false'"
           echo "::set-output name=new_stage::'true'"; \
         
