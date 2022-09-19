@@ -54,13 +54,13 @@ jobs:
       release_version: ${{ steps.set_project_name.outputs.release_version}}
     steps:
       - name: Checkout
-        if: github.event_name == 'release' || github.event_name == 'push' || github.event_name == 'pull_request'
+        if: contains(fromJson('["push", "release", "pull_request"]'), github.event_name)
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
 
       - name: Set release version
-        if: github.event_name == 'release'
+        if: contains(fromJson('["release"]'), github.event_name)
         id: prod-release-version-release
         run: |
           echo "Event name: "${{github.event_name}}
@@ -69,7 +69,7 @@ jobs:
           echo "Release version: "${GITHUB_REF#refs/*/} ; \
 
       - name: Set PR release version
-        if: github.event_name == 'pull_request'
+        if: contains(fromJson('["pull_request"]'), github.event_name)
         id: prod-release-version-pull-request
         run: |
           echo "Event name: "${{github.event_name}}
@@ -86,7 +86,7 @@ jobs:
 
       - name: Extract branch name
         id: extract_branch
-        if: github.event_name == 'release' || github.event_name == 'pull_request' || github.event_name == 'push'
+        if: contains(fromJson('["push", "release", "pull_request"]'), github.event_name)
         shell: bash
         run: |
           if [[ ${{github.event_name}} == 'pull_request' ]]; \
@@ -99,7 +99,7 @@ jobs:
           fi
 
       - name: Set release/branch version - staging
-        if: github.event_name == 'push'
+        if: contains(fromJson('["push"]'), github.event_name)
         run: |
           RELEASE_VERSION=${GITHUB_REF#refs/*/}
           RELEASE_VERSION=$(echo $RELEASE_VERSION | sed s/staging/v/g)
@@ -108,7 +108,7 @@ jobs:
           echo "BRANCH_NAME=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
 
       - name: Get AWS Codebuild project
-        if: github.event_name == 'release' || github.event_name == 'push' || github.event_name == 'pull_request'
+        if: contains(fromJson('["push", "release", "pull_request"]'), github.event_name)
         id: set_project_name
         shell: bash
         run: |
@@ -128,7 +128,7 @@ jobs:
           echo "::set-output name=release_version::$RELEASE_VERSION"
       
       - name: Configure AWS Credentials
-        if: github.event_name == 'release' || github.event_name == 'push' || github.event_name == 'pull_request'
+        if: contains(fromJson('["push", "release", "pull_request"]'), github.event_name)
         uses: aws-actions/configure-aws-credentials@v1
         with:
           aws-access-key-id: ${{ secrets.CICD_AWS_ACCESS_KEY_ID }}
@@ -136,7 +136,7 @@ jobs:
           aws-region: ${{ secrets.CICD_AWS_REGION }}
 
       - name: Check if project exists
-        if: github.event_name == 'release' || github.event_name == 'push' || github.event_name == 'pull_request'
+        if: contains(fromJson('["push", "release", "pull_request"]'), github.event_name)
         id: check-project
         shell: bash
         run: |
@@ -154,7 +154,7 @@ jobs:
         
       - name: Run AWS CodeBuild
         id: codebuild
-        if: ${{ steps.check-project.outputs.project_exist }} == "true" && ( github.event_name == 'release' || github.event_name == 'push' )
+        if: ${{ steps.check-project.outputs.project_exist }} == "true" && contains(fromJson('["push", "release"]'), github.event_name)
         uses: aws-actions/aws-codebuild-run-build@v1
         with:
           project-name: ${{ env.PROJECT }}
@@ -164,7 +164,7 @@ jobs:
           RELEASE_VERSION: ${{ env.RELEASE_VERSION }}
 
       - name: Google Chat Notification
-        if: ${{ steps.check-project.outputs.project_exist }} == "true" && ( github.event_name == 'release' || github.event_name == 'push' ) 
+        if: ${{ steps.check-project.outputs.project_exist }} == "true" && contains(fromJson('["push", "release"]'), github.event_name)
         uses: nakamuraos/google-chat-notifications@v2.0.1
         with:
           title: Image Build
