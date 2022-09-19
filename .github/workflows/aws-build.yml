@@ -140,7 +140,7 @@ jobs:
         id: check-project
         shell: bash
         run: |
-          aws codebuild list-projects --region ${{ secrets.CICD_AWS_REGION }} --query 'projects[?contains(@,`${{ env.PROJECT }}`) == `true`]'
+          PROJECT_EXIST=$(aws codebuild list-projects --region ${{ secrets.CICD_AWS_REGION }} --query 'projects[?contains(@,`${{ env.PROJECT }}`) == `true`]')
           echo "::set-output name=project_exist::'false'"
           echo "::set-output name=new_stage::'true'"; \
         
