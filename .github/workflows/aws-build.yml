@@ -47,8 +47,8 @@ jobs:
     runs-on: ${{ inputs.runner }}
     name: AWS CodeBuild Trigger and Helm Push
     outputs:
-      new_stage: ${{ steps.set_project_name.outputs.new_stage }}
-      stage_check: ${{ steps.set_project_name.outputs.project_exist }}
+      new_stage: ${{ steps.check-project.outputs.new_stage }}
+      stage_check: ${{ steps.check-project.outputs.project_exist }}
       stage: ${{ steps.set_project_name.outputs.stage }}
       env_check: ${{ steps.set_project_name.outcome }}
       release_version: ${{ steps.set_project_name.outputs.release_version}}
@@ -115,22 +115,14 @@ jobs:
           if [[ $BRANCH_NAME == "master" && ${{ secrets.CODEBUILD_PROJECT_PROD != ''}} == 'true' ]]; \
           then \
           echo "PROJECT=$(echo ${{secrets.CODEBUILD_PROJECT_PROD}}-production)" >> $GITHUB_ENV; \
-          echo "::set-output name=project_exist::'true'"; \
-          echo "::set-output name=new_stage::'false'"; \
           elif [[ $BRANCH_NAME == "beta" && ${{ secrets.CODEBUILD_PROJECT_PROD != ''}} == 'true' ]];\
           then \
           echo "PROJECT=$(echo ${{secrets.CODEBUILD_PROJECT_PROD}}-beta)" >> $GITHUB_ENV; \
-          echo "::set-output name=project_exist::'true'"; \
-          echo "::set-output name=new_stage::'false'"; \
           elif [[ ${{ secrets.CODEBUILD_PROJECT_STAGING != ''}} == 'true' ]];\
           then \
           echo "PROJECT=$(echo ${{secrets.CODEBUILD_PROJECT_STAGING}}-$BRANCH_NAME)" >> $GITHUB_ENV; \
-          echo "::set-output name=project_exist::'true'"; \
-          echo "::set-output name=new_stage::'false'"; \
           else \
           echo "PROJECT=NONE_PROJECTS" >> $GITHUB_ENV; \
-          echo "::set-output name=project_exist::'false'"; \
-          echo "::set-output name=new_stage::'true'"; \
           fi
           echo "::set-output name=stage::$BRANCH_NAME"
           echo "::set-output name=release_version::$RELEASE_VERSION"
@@ -143,26 +135,25 @@ jobs:
           aws-secret-access-key: ${{ secrets.CICD_AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.CICD_AWS_REGION }}
 
-      # - name: Check if project exists
-      #   if: github.event_name == 'release' || github.event_name == 'push' || github.event_name == 'pull_request'
-      #   id: check-project
-      #   shell: bash
-      #   continue-on-error: true
-      #   run: |
-      #     PROJECT_EXIST=$(aws codebuild list-projects --region ${{ secrets.CICD_AWS_REGION }} --query 'projects[?contains(@,`${{ env.PROJECT }}`) == `true`]' | jq -e 'length > 0')
-      #     echo "Project exist: "$PROJECT_EXIST
-      #     echo "::set-output name=project_exist::$PROJECT_EXIST"
-      #     if [[ $PROJECT_EXIST == "true" ]]; \
-      #     then \
-      #       echo "::set-output name=new_stage::'false'"; \
-      #     elif [[ $PROJECT_EXIST == "false" ]]; \
-      #     then \
-      #       echo "::set-output name=new_stage::'true'"; \
-      #     fi
+      - name: Check if project exists
+        if: github.event_name == 'release' || github.event_name == 'push' || github.event_name == 'pull_request'
+        id: check-project
+        shell: bash
+        run: |
+          PROJECT_EXIST=$(aws codebuild list-projects --region ${{ secrets.CICD_AWS_REGION }} --query 'projects[?contains(@,`${{ env.PROJECT }}`) == `true`]' | jq -e 'length > 0')
+          echo "Project exist: "$PROJECT_EXIST
+          echo "::set-output name=project_exist::$PROJECT_EXIST"
+          if [[ $PROJECT_EXIST == "true" ]]; \
+          then \
+            echo "::set-output name=new_stage::'false'"; \
+          elif [[ $PROJECT_EXIST == "false" ]]; \
+          then \
+            echo "::set-output name=new_stage::'true'"; \
+          fi
         
       - name: Run AWS CodeBuild
         id: codebuild
-        if: steps.set_project_name.outputs.project_exist=='true' && ( github.event_name == 'release' || github.event_name == 'push' )
+        if: steps.check-project.outputs.project_exist=='true' && ( github.event_name == 'release' || github.event_name == 'push' )
         uses: aws-actions/aws-codebuild-run-build@v1
         with:
           project-name: ${{ env.PROJECT }}
@@ -172,7 +163,7 @@ jobs:
           RELEASE_VERSION: ${{ env.RELEASE_VERSION }}
 
       - name: Google Chat Notification
-        if: steps.set_project_name.outputs.project_exist=='true' && ( github.event_name == 'release' || github.event_name == 'push' ) 
+        if: steps.check-project.outputs.project_exist=='true' && ( github.event_name == 'release' || github.event_name == 'push' ) 
         uses: nakamuraos/google-chat-notifications@v2.0.1
         with:
           title: Image Build
@@ -180,18 +171,12 @@ jobs:
           webhookUrl: ${{ secrets.GOOGLE_WEBHOOK }}
           status: ${{ steps.codebuild.outcome }}
 
-      - name: Pull request outputs set
-        shell: bash
-        working-directory: .infra/terraform
-        run: |
-          echo "new_stage: " ${{ steps.set_project_name.outputs.new_stage }}
-
       - name: Output checks
         shell: bash
         working-directory: .infra/terraform
         run: |
-          echo "new_stage: " ${{ steps.set_project_name.outputs.new_stage }}
-          echo "stage_check: " ${{ steps.set_project_name.outputs.project_exist }}
+          echo "new_stage: " ${{ steps.check-project.outputs.new_stage }}
+          echo "stage_check: " ${{ steps.check-project.outputs.project_exist }}
           echo "stage: " ${{ steps.set_project_name.outputs.stage }}
           echo "env_check: " ${{ steps.set_project_name.outcome }}
           echo "release_version: " ${{ steps.set_project_name.outputs.release_version}}
