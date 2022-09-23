@@ -154,7 +154,7 @@ jobs:
         
       - name: Run AWS CodeBuild
         id: codebuild
-        if: ${{ steps.check-project.outputs.project_exist }} == "true" && contains(fromJson('["push", "release"]'), github.event_name)
+        if: contains(fromJson('["true"]'), steps.check-project.outputs.project_exist ) && contains(fromJson('["push", "release"]'), github.event_name)
         uses: aws-actions/aws-codebuild-run-build@v1
         with:
           project-name: ${{ env.PROJECT }}
@@ -164,7 +164,7 @@ jobs:
           RELEASE_VERSION: ${{ env.RELEASE_VERSION }}
 
       - name: Google Chat Notification
-        if: ${{ steps.check-project.outputs.project_exist }} == "true" && contains(fromJson('["push", "release"]'), github.event_name)
+        if: contains(fromJson('["true"]'), steps.check-project.outputs.project_exist ) && contains(fromJson('["push", "release"]'), github.event_name)
         uses: nakamuraos/google-chat-notifications@v2.0.1
         with:
           title: Image Build
