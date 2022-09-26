@@ -112,13 +112,13 @@ jobs:
         id: set_project_name
         shell: bash
         run: |
-          if [[ $BRANCH_NAME == "master" && ${{ secrets.CODEBUILD_PROJECT_PROD != ''}} == 'true' ]]; \
+          if [[ $BRANCH_NAME == "master" && ${{ secrets.CODEBUILD_PROJECT_PROD != ''}} == true ]]; \
           then \
           echo "PROJECT=$(echo ${{secrets.CODEBUILD_PROJECT_PROD}}-production)" >> $GITHUB_ENV; \
-          elif [[ $BRANCH_NAME == "beta" && ${{ secrets.CODEBUILD_PROJECT_PROD != ''}} == 'true' ]];\
+          elif [[ $BRANCH_NAME == "beta" && ${{ secrets.CODEBUILD_PROJECT_PROD != ''}} == true ]];\
           then \
           echo "PROJECT=$(echo ${{secrets.CODEBUILD_PROJECT_PROD}}-beta)" >> $GITHUB_ENV; \
-          elif [[ ${{ secrets.CODEBUILD_PROJECT_STAGING != ''}} == 'true' ]];\
+          elif [[ ${{ secrets.CODEBUILD_PROJECT_STAGING != ''}} == true ]];\
           then \
           echo "PROJECT=$(echo ${{secrets.CODEBUILD_PROJECT_STAGING}}-$BRANCH_NAME)" >> $GITHUB_ENV; \
           else \
