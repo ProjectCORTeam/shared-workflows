@@ -110,12 +110,12 @@ jobs:
         run: |
           if [[ $BRANCH_NAME == "master" ]]; \
           then \
-          echo "PROJECT=$(echo cor-prod-${{secrets.CICD_AWS_REGION}}-${{env.SERVICE_TYPE}}-${{env.SERVICE_NAME}}-production)" >> $GITHUB_ENV; \
+          echo "PROJECT=$(echo cor-prod-us-east-2-${{env.SERVICE_TYPE}}-${{env.SERVICE_NAME}}-production)" >> $GITHUB_ENV; \
           elif [[ $BRANCH_NAME == "beta" ]];\
           then \
-          echo "PROJECT=$(echo cor-prod-${{secrets.CICD_AWS_REGION}}-${{env.SERVICE_TYPE}}-${{env.SERVICE_NAME}}-beta)" >> $GITHUB_ENV; \
+          echo "PROJECT=$(echo cor-prod-us-east-2-${{env.SERVICE_TYPE}}-${{env.SERVICE_NAME}}-beta)" >> $GITHUB_ENV; \
           else \
-          echo "PROJECT=$(echo cor-staging-${{secrets.CICD_AWS_REGION}}-${{env.SERVICE_TYPE}}-${{env.SERVICE_NAME}}-$BRANCH_NAME)" >> $GITHUB_ENV; \
+          echo "PROJECT=$(echo cor-staging-us-east-2-${{env.SERVICE_TYPE}}-${{env.SERVICE_NAME}}-$BRANCH_NAME)" >> $GITHUB_ENV; \
           fi
           echo "::set-output name=stage::$BRANCH_NAME"
           echo "::set-output name=release_version::$RELEASE_VERSION"
