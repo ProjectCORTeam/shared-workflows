@@ -29,10 +29,6 @@ on:
         description: "Semantic versioning for production environment"
         value: ${{ jobs.aws-build.outputs.release_version }}
     secrets: 
-      CODEBUILD_PROJECT_PROD:
-        required: true
-      CODEBUILD_PROJECT_STAGING:
-        required: true
       CICD_AWS_ACCESS_KEY_ID:
         required: true
       CICD_AWS_SECRET_ACCESS_KEY:
@@ -112,17 +108,14 @@ jobs:
         id: set_project_name
         shell: bash
         run: |
-          if [[ $BRANCH_NAME == "master" && ${{ secrets.CODEBUILD_PROJECT_PROD != ''}} == true ]]; \
+          if [[ $BRANCH_NAME == "master" ]]; \
           then \
-          echo "PROJECT=$(echo ${{secrets.CODEBUILD_PROJECT_PROD}}-production)" >> $GITHUB_ENV; \
-          elif [[ $BRANCH_NAME == "beta" && ${{ secrets.CODEBUILD_PROJECT_PROD != ''}} == true ]];\
+          echo "PROJECT=$(echo cor-prod-${{secrets.CICD_AWS_REGION}}-${{env.SERVICE_TYPE}}-${{env.SERVICE_NAME}}-production)" >> $GITHUB_ENV; \
+          elif [[ $BRANCH_NAME == "beta" ]];\
           then \
-          echo "PROJECT=$(echo ${{secrets.CODEBUILD_PROJECT_PROD}}-beta)" >> $GITHUB_ENV; \
-          elif [[ ${{ secrets.CODEBUILD_PROJECT_STAGING != ''}} == true ]];\
-          then \
-          echo "PROJECT=$(echo ${{secrets.CODEBUILD_PROJECT_STAGING}}-$BRANCH_NAME)" >> $GITHUB_ENV; \
+          echo "PROJECT=$(echo cor-prod-${{secrets.CICD_AWS_REGION}}-${{env.SERVICE_TYPE}}-${{env.SERVICE_NAME}}-beta)" >> $GITHUB_ENV; \
           else \
-          echo "PROJECT=NONE_PROJECTS" >> $GITHUB_ENV; \
+          echo "PROJECT=$(echo cor-staging-${{secrets.CICD_AWS_REGION}}-${{env.SERVICE_TYPE}}-${{env.SERVICE_NAME}}-$BRANCH_NAME)" >> $GITHUB_ENV; \
           fi
           echo "::set-output name=stage::$BRANCH_NAME"
           echo "::set-output name=release_version::$RELEASE_VERSION"

@@ -30,10 +30,6 @@ on:
         default: true
         description: "Enable notifications to cloud or team owner flag"
     secrets: 
-      CODEBUILD_PROJECT_PROD:
-        required: true
-      CODEBUILD_PROJECT_STAGING:
-        required: true
       CICD_AWS_ACCESS_KEY_ID:
         required: true
       CICD_AWS_SECRET_ACCESS_KEY:
