@@ -144,9 +144,9 @@ jobs:
           then \
             echo "::set-output name=project_exist::false"; \
             echo "::set-output name=new_stage::true"; \
-            echo "::set-output name=codebuild_project::$CODEBUILD"; \
-            echo "CODEBUILD_PROJECT=$CODEBUILD" >> $GITHUB_ENV;
           fi
+          echo "::set-output name=codebuild_project::$CODEBUILD"; \
+          echo "CODEBUILD_PROJECT=$CODEBUILD" >> $GITHUB_ENV;
           echo $CODEBUILD_PROJECT
         
       - name: Run AWS CodeBuild
