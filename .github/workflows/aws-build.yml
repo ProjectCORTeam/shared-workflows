@@ -133,18 +133,18 @@ jobs:
         id: check-project
         shell: bash
         run: |
-          CODEBUILD_PROJECT=$(aws codebuild list-projects --region ${{ secrets.CICD_AWS_REGION }} --query 'projects[?contains(@,`${{ env.PROJECT }}`) == `true`]' | jq ".[0]" | tr -d '"')
-          echo "Codebuild project: "$CODEBUILD_PROJECT
-          if [[ $CODEBUILD_PROJECT != "null" ]]; \
+          CODEBUILD=$(aws codebuild list-projects --region ${{ secrets.CICD_AWS_REGION }} --query 'projects[?contains(@,`${{ env.PROJECT }}`) == `true`]' | jq ".[0]" | tr -d '"')
+          echo "Codebuild project: "$CODEBUILD
+          if [[ $CODEBUILD != "null" ]]; \
           then \
             echo "::set-output name=new_stage::false"; \
             echo "::set-output name=project_exist::true"; \
-          elif [[ $CODEBUILD_PROJECT == "null" ]]; \
+          elif [[ $CODEBUILD == "null" ]]; \
           then \
             echo "::set-output name=project_exist::false"; \
             echo "::set-output name=new_stage::true"; \
-            echo "::set-output name=codebuild_project::$CODEBUILD_PROJECT"; \
-            echo "CODEBUILD_PROJECT=$CODEBUILD_PROJECT" >> $GITHUB_ENV;
+            echo "::set-output name=codebuild_project::$CODEBUILD"; \
+            echo "CODEBUILD_PROJECT=$CODEBUILD" >> $GITHUB_ENV;
           fi
         
       - name: Run AWS CodeBuild
