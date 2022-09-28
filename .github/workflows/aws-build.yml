@@ -152,7 +152,7 @@ jobs:
         if: contains(fromJson('["true"]'), steps.check-project.outputs.project_exist ) && contains(fromJson('["push", "release"]'), github.event_name)
         uses: aws-actions/aws-codebuild-run-build@v1
         with:
-          project-name: ${{ env.CODEBUILD_PROJECT }}
+          project-name: ${{ steps.check-project.outputs.codebuild_project }}
           env-vars-for-codebuild: |
             RELEASE_VERSION
         env:
