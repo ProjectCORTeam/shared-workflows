@@ -133,16 +133,17 @@ jobs:
         id: check-project
         shell: bash
         run: |
-          PROJECT_EXIST=$(aws codebuild list-projects --region ${{ secrets.CICD_AWS_REGION }} --query 'projects[?contains(@,`${{ env.PROJECT }}`) == `true`]')
-          echo "Project_exist: "$PROJECT_EXIST
-          if [[ $PROJECT_EXIST != "[]" ]]; \
+          CODEBUILD_PROJECT=$(aws codebuild list-projects --region ${{ secrets.CICD_AWS_REGION }} --query 'projects[?contains(@,`${{ env.PROJECT }}`) == `true`]' | jq ".[0]" | tr -d '"')
+          echo "Codebuild project: "$CODEBUILD_PROJECT
+          if [[ $CODEBUILD_PROJECT != "null" ]]; \
           then \
             echo "::set-output name=new_stage::false"; \
             echo "::set-output name=project_exist::true"; \
-          elif [[ $PROJECT_EXIST == "[]" ]]; \
+          elif [[ $CODEBUILD_PROJECT == "null" ]]; \
           then \
             echo "::set-output name=project_exist::false"; \
             echo "::set-output name=new_stage::true"; \
+            echo "::set-output name=codebuild_project::$CODEBUILD_PROJECT"; \
           fi
         
       - name: Run AWS CodeBuild
@@ -150,7 +151,7 @@ jobs:
         if: contains(fromJson('["true"]'), steps.check-project.outputs.project_exist ) && contains(fromJson('["push", "release"]'), github.event_name)
         uses: aws-actions/aws-codebuild-run-build@v1
         with:
-          project-name: ${{ env.PROJECT }}
+          project-name: ${{ steps.check-project.outputs.codebuild_project }}
           env-vars-for-codebuild: |
             RELEASE_VERSION
         env:
