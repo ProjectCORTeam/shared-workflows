@@ -157,15 +157,15 @@ jobs:
         #         body: output
         #       })
 
-        - name: truncate terraform plan staging result
-          if: github.event_name == 'pull_request' && contains( github.base_ref, 'staging' )
-          run: |
-            plan=$(cat <<'EOF'
-            ${{ format('{0}{1}', steps.plan-staging.outputs.stdout, steps.plan-staging.outputs.stderr) }}
-            EOF
-            )
-            echo "${plan}" | grep -v 'Refreshing state' >> $GITHUB_ENV
-            echo "EOF" >> $GITHUB_ENV
+        # - name: truncate terraform plan staging result
+        #   if: github.event_name == 'pull_request' && contains( github.base_ref, 'staging' )
+        #   run: |
+        #     plan=$(cat <<'EOF'
+        #     ${{ format('{0}{1}', steps.plan-staging.outputs.stdout, steps.plan-staging.outputs.stderr) }}
+        #     EOF
+        #     )
+        #     echo "${plan}" | grep -v 'Refreshing state' >> $GITHUB_ENV
+        #     echo "EOF" >> $GITHUB_ENV
 
         - name: create comment from plan staging result
           uses: actions/github-script@0.9.0
