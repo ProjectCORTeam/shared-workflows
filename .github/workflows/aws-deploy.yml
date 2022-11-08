@@ -333,7 +333,7 @@ jobs:
 
         - name: Terraform Apply Beta
           if: github.event_name == 'release' && contains( github.base_ref, 'beta' )
-          id: infra-apply-production
+          id: infra-apply-beta
           run: terraform apply -auto-approve -input=false -target='module.shared' -target='module.prod["beta"]'
           working-directory: .infra/terraform
 
@@ -343,8 +343,17 @@ jobs:
           run: terraform apply -auto-approve -input=false -target='module.shared' -target='module.prod["production"]'
           working-directory: .infra/terraform
 
+        - name: Google Chat Notification - Beta
+          if: github.event_name == 'release' && contains( github.base_ref, 'beta' )
+          uses: nakamuraos/google-chat-notifications@v2.0.1
+          with:
+            title: Infrastructure Apply
+            subtitle: ${{ env.STAGE }}
+            webhookUrl: ${{ secrets.GOOGLE_WEBHOOK }}
+            status: ${{ steps.infra-apply-beta.outcome }}
+
         - name: Google Chat Notification - Production
-          if: github.event_name == 'release' 
+          if: github.event_name == 'release' && contains( github.base_ref, 'master' )
           uses: nakamuraos/google-chat-notifications@v2.0.1
           with:
             title: Infrastructure Apply
