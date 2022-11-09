@@ -129,7 +129,7 @@ jobs:
         - name: Terraform Plan Staging
           id: plan-staging
           if: github.event_name == 'pull_request' && contains( github.base_ref, 'staging' )
-          run: terraform plan -no-color -input=false -target='module.shared' -target='module.staging'
+          run: terraform plan -no-color -input=false -target='module.shared' -target='module.staging["${{ env.STAGE }}"]'
           continue-on-error: true
           working-directory: .infra/terraform
 
