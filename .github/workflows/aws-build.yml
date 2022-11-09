@@ -139,7 +139,7 @@ jobs:
           if [[ $CODEBUILD != "null" ]]; \
           then \
             echo "new_stage=false" >> $GITHUB_OUTPUT; \
-            echo "project_exis=:true" >> $GITHUB_OUTPUT; \
+            echo "project_exist=:true" >> $GITHUB_OUTPUT; \
           elif [[ $CODEBUILD == "null" ]]; \
           then \
             echo "project_exist=false" >> $GITHUB_OUTPUT; \
