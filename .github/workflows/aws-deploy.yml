@@ -3,6 +3,9 @@ name: AWS Build
 on: 
   workflow_call:
     inputs: 
+      trigger_type:
+        required: true
+        type: string
       runner:
         required: false
         type: string
