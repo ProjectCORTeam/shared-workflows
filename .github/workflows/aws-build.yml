@@ -152,18 +152,19 @@ jobs:
           echo "CODEBUILD_PROJECT=$CODEBUILD" >> $GITHUB_ENV;
           echo $CODEBUILD_PROJECT
         
+
       - name: Run AWS CodeBuild
         id: codebuild
         if: contains(fromJson('["true"]'), steps.check-project.outputs.project_exist ) && contains(fromJson('["push", "release", "workflow_dispatch"]'), github.event_name)
         uses: dark-mechanicum/aws-codebuild@v1
         env:
           CODEBUILD__sourceVersion: ${{ env.BRANCH_NAME }}
+          CODEBUILD__environmentVariablesOverride: |
+            '[
+              { "name":"RELEASE_VERSION", "value":"${{ secrets.RELEASE_VERSION }}", "type": "PLAINTEXT" }
+            ]'
         with:
           projectName: ${{ env.CODEBUILD_PROJECT }}
-          env:
-            CODEBUILD__environmentVariablesOverride: '[
-              { "name":"RELEASE_VERSION", "value":"${{ secrets.RELEASE_VERSION }}", "type": "PLAINTEXT" }
-          ]'
 
       - name: Google Chat Notification
         if: contains(fromJson('["true"]'), steps.check-project.outputs.project_exist ) && contains(fromJson('["push", "release", "workflow_dispatch"]'), github.event_name)
