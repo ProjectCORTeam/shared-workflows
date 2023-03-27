@@ -163,6 +163,12 @@ jobs:
           CODEBUILD__sourceVersion: ${{ env.BRANCH_NAME }}
         with:
           projectName: ${{ env.CODEBUILD_PROJECT }}
+          buildspec: | 
+            '{
+              "environmentVariablesOverride":[
+                { "name":"RELEASE_VERSION", "value":"${{ env.RELEASE_VERSION }}", "type": "PLAINTEXT" },
+              ]
+            }'
 
       - name: Google Chat Notification
         if: contains(fromJson('["true"]'), steps.check-project.outputs.project_exist ) && contains(fromJson('["push", "release", "workflow_dispatch"]'), github.event_name)
