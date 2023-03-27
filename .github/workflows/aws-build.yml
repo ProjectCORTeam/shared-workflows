@@ -161,9 +161,8 @@ jobs:
         uses: dark-mechanicum/aws-codebuild@v1
         env:
           CODEBUILD__sourceVersion: ${{ env.BRANCH_NAME }}
-          CODEBUILD__environmentVariablesOverride: |
-            '[
-              { "name":"RELEASE_VERSION", "value":"${{ env.RELEASE_VERSION }}", "type": "PLAINTEXT" }
+          CODEBUILD__environmentVariablesOverride: '[
+            { "name":"RELEASE_VERSION", "value":"${{ env.RELEASE_VERSION }}", "type": "PLAINTEXT"  },
             ]'
         with:
           projectName: ${{ env.CODEBUILD_PROJECT }}
