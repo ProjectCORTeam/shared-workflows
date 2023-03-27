@@ -129,7 +129,7 @@ jobs:
       
       - name: Configure AWS Credentials
         if: contains(fromJson('["push", "release", "pull_request", "workflow_dispatch"]'), github.event_name)
-        uses: aws-actions/configure-aws-credentials@v1
+        uses: aws-actions/configure-aws-credentials@v2
         with:
           aws-access-key-id: ${{ secrets.CICD_AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.CICD_AWS_SECRET_ACCESS_KEY }}
@@ -163,8 +163,7 @@ jobs:
           CODEBUILD__sourceVersion: ${{ env.BRANCH_NAME }}
         with:
           projectName: ${{ env.CODEBUILD_PROJECT }}
-          buildspec: | 
-            '{
+          buildspec: '{
               "environmentVariablesOverride":[
                 { "name":"RELEASE_VERSION", "value":"${{ env.RELEASE_VERSION }}", "type": "PLAINTEXT" },
               ]
