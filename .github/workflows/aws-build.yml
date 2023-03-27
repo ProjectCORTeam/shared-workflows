@@ -163,7 +163,7 @@ jobs:
           CODEBUILD__sourceVersion: ${{ env.BRANCH_NAME }}
           CODEBUILD__environmentVariablesOverride: |
             '[
-              { "name":"RELEASE_VERSION", "value":"${{ secrets.RELEASE_VERSION }}", "type": "PLAINTEXT" }
+              { "name":"RELEASE_VERSION", "value":"${{ env.RELEASE_VERSION }}", "type": "PLAINTEXT" }
             ]'
         with:
           projectName: ${{ env.CODEBUILD_PROJECT }}
