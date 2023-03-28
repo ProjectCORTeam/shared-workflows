@@ -131,7 +131,7 @@ jobs:
 
         - name: Terraform Plan Staging
           id: plan-staging
-          if: github.event_name == 'pull_request' && contains( github.base_ref, 'staging' )
+          if: github.event_name == 'workflow_dispatch'
           run: terraform plan -no-color -input=false -target='module.shared' -target='module.staging["${{ env.STAGE }}"]'
           continue-on-error: true
           working-directory: .infra/terraform
@@ -206,13 +206,13 @@ jobs:
           run: exit 1
         
         - name: Terraform Apply Staging
-          if: github.event_name == 'push' && contains(github.ref, 'staging')
+          if: github.event_name == 'workflow_dispatch'
           id: infra-apply-staging
           run: terraform apply -auto-approve -input=false -target='module.shared' -target='module.staging["${{ env.STAGE }}"]'
           working-directory: .infra/terraform
 
         - name: Google Chat Notification - Staging
-          if: github.event_name == 'push' && contains(github.ref, 'staging')
+          if: github.event_name == 'workflow_dispatch'
           uses: nakamuraos/google-chat-notifications@v2.0.1
           with:
             title: Infrastructure Apply
