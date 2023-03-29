@@ -161,6 +161,7 @@ jobs:
         uses: dark-mechanicum/aws-codebuild@v1
         env:
           CODEBUILD__sourceVersion: ${{ env.BRANCH_NAME }}
+          CODEBUILD__logsConfigOverride__cloudWatchLogs__status: 'ENABLED'
         with:
           projectName: ${{ env.CODEBUILD_PROJECT }}
           buildspec: '{
