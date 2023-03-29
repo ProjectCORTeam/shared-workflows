@@ -140,7 +140,7 @@ jobs:
         id: check-project
         shell: bash
         run: |
-          CODEBUILD=$(aws codebuild list-projects --region ${{ secrets.CICD_AWS_REGION }} --query 'projects[?contains(@,`${{ env.PROJECT }}`) == `true`]' | jq ".[0]" | tr -d '"')
+          CODEBUILD=$(aws codebuild list-projects --region ${{ secrets.CICD_AWS_REGION }} --query 'projects[?ends_with(@,`${{ env.PROJECT }}`) == `true`]' | jq ".[0]" | tr -d '"')
           echo "Codebuild project: "$CODEBUILD
           if [[ $CODEBUILD != "null" ]]; \
           then \
