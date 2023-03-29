@@ -83,11 +83,11 @@ jobs:
           run: |
             jq --argjson new_env '{"new_env": false}' '(.env_settings[]) += $new_env' infra-config.json  > ./terraform/terraform.auto.tfvars.json ; \
             if [ ${{env.STAGE}} == 'production' ]; then \
-              jq --argjson new_env '{"new_env": ${{ inputs.new_stage }}}' '.env_settings |= map(if .stage == "${{env.STAGE}}" then . + $new_env else . end)'  infra-config.json  | jq --arg version ${{inputs.release_version}} '(.env_settings[] | select(.stage == "production")) += {release_version: $version}'  > ./terraform/terraform.auto.tfvars.json;\
+              jq --argjson new_env '{"new_env": false}' '(.env_settings[]) += $new_env' infra-config.json | jq --argjson new_env '{"new_env": ${{ inputs.new_stage }}}' '.env_settings |= map(if .stage == "${{env.STAGE}}" then . + $new_env else . end)' | jq --arg version ${{inputs.release_version}} '(.env_settings[] | select(.stage == "production")) += {release_version: $version}'  > ./terraform/terraform.auto.tfvars.json;\
               elif [ ${{env.STAGE}} == 'beta' ]; then \
-              jq --argjson new_env '{"new_env": ${{ inputs.new_stage }}}' '.env_settings |= map(if .stage == "${{env.STAGE}}" then . + $new_env else . end)' infra-config.json  | jq --arg version ${{inputs.release_version}} '(.env_settings[] | select(.stage == "beta")) += {release_version: $version}'  > ./terraform/terraform.auto.tfvars.json ;\
+              jq --argjson new_env '{"new_env": false}' '(.env_settings[]) += $new_env' infra-config.json | jq --argjson new_env '{"new_env": ${{ inputs.new_stage }}}' '.env_settings |= map(if .stage == "${{env.STAGE}}" then . + $new_env else . end)' | jq --arg version ${{inputs.release_version}} '(.env_settings[] | select(.stage == "beta")) += {release_version: $version}'  > ./terraform/terraform.auto.tfvars.json ;\
               else \
-              jq --argjson new_env '{"new_env": ${{ inputs.new_stage }}}' '.env_settings |= map(if .stage == "${{env.STAGE}}" then . + $new_env else . end)' infra-config.json  > ./terraform/terraform.auto.tfvars.json ; \
+              jq --argjson new_env '{"new_env": false}' '(.env_settings[]) += $new_env' infra-config.json | jq --argjson new_env '{"new_env": ${{ inputs.new_stage }}}' '.env_settings |= map(if .stage == "${{env.STAGE}}" then . + $new_env else . end)' > ./terraform/terraform.auto.tfvars.json ; \
               fi
             terraform fmt
             cat ./terraform/terraform.auto.tfvars.json
