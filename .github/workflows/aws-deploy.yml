@@ -130,12 +130,12 @@ jobs:
           run: terraform validate -no-color
           working-directory: .infra/terraform
 
-        - name: Terraform Plan Staging
-          id: plan-staging
-          if: github.event_name == 'workflow_dispatch'
-          run: terraform plan -no-color -input=false -target='module.shared' -target='module.staging["${{ env.STAGE }}"]'
-          continue-on-error: true
-          working-directory: .infra/terraform
+        # - name: Terraform Plan Staging
+        #   id: plan-staging
+        #   if: github.event_name == 'workflow_dispatch'
+        #   run: terraform plan -no-color -input=false -target='module.shared' -target='module.staging["${{ env.STAGE }}"]'
+        #   continue-on-error: true
+        #   working-directory: .infra/terraform
 
         # - uses: actions/github-script@v6
         #   if: github.event_name == 'pull_request' && contains( github.base_ref, 'staging' )
