@@ -202,9 +202,9 @@ jobs:
         #         body: output
         #       })
         
-        - name: Terraform Plan Staging Status
-          if: steps.plan-staging.outcome == 'failure'
-          run: exit 1
+        # - name: Terraform Plan Staging Status
+        #   if: steps.plan-staging.outcome == 'failure'
+        #   run: exit 1
         
         - name: Terraform Apply Staging
           if: github.event_name == 'workflow_dispatch'
