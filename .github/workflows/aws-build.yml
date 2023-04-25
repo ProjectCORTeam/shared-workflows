@@ -118,13 +118,15 @@ jobs:
           if [[ $BRANCH_NAME == "master" ]]; \
           then \
           echo "PROJECT=$(echo $SERVICE_NAME-production)" >> $GITHUB_ENV; \
+          echo "stage=production" >> $GITHUB_OUTPUT \
           elif [[ $BRANCH_NAME == "beta" ]];\
           then \
           echo "PROJECT=$(echo $SERVICE_NAME-beta)" >> $GITHUB_ENV; \
+          echo "stage=production" >> $GITHUB_OUTPUT \
           else \
           echo "PROJECT=$(echo $SERVICE_NAME-${{ inputs.staging_target }})" >> $GITHUB_ENV; \
-          fi
           echo "stage=${{ inputs.staging_target }}" >> $GITHUB_OUTPUT
+          fi
           echo "release_version=$RELEASE_VERSION" >> $GITHUB_OUTPUT
       
       - name: Configure AWS Credentials
