@@ -69,6 +69,8 @@ jobs:
           shell: bash
           working-directory: .infra/terraform
           run: |
+            echo "github_event: "${{github.event_name }}
+            echo "github_branch: "${{github.base_ref}}
             echo "runner: "${{ inputs.runner }}
             echo "env_check: "${{inputs.env_check}}
             echo "new_stage: "${{ inputs.new_stage }}
@@ -130,82 +132,6 @@ jobs:
           run: terraform validate -no-color
           working-directory: .infra/terraform
 
-        # - name: Terraform Plan Staging
-        #   id: plan-staging
-        #   if: github.event_name == 'workflow_dispatch'
-        #   run: terraform plan -no-color -input=false -target='module.shared' -target='module.staging["${{ env.STAGE }}"]'
-        #   continue-on-error: true
-        #   working-directory: .infra/terraform
-
-        # - uses: actions/github-script@v6
-        #   if: github.event_name == 'pull_request' && contains( github.base_ref, 'staging' )
-        #   env:
-        #     PLAN: "terraform\n${{ steps.plan-staging.outputs.stdout }}"
-        #   with:
-        #     github-token: ${{ secrets.ACTIONS_TOKEN }}
-        #     script: |
-        #       const output = `#### Terraform Format and Style 🖌\`${{ steps.fmt.outcome }}\`
-        #       #### Terraform Initialization ⚙️\`${{ steps.init.outcome }}\`
-        #       #### Terraform Validation 🤖\`${{ steps.validate.outcome }}\`
-        #       #### Terraform Plan 📖\`${{ steps.plan-staging.outcome }}\`
-        #       <details><summary>Show Plan</summary>
-        #       \`\`\`\n
-        #       ${process.env.PLAN}
-        #       \`\`\`
-        #       </details>
-        #       *Pushed by: @${{ github.actor }}, Action: \`${{ github.event_name }}\`*`;
-        #       github.rest.issues.createComment({
-        #         issue_number: context.issue.number,
-        #         owner: context.repo.owner,
-        #         repo: context.repo.repo,
-        #         body: output
-        #       })
-
-        # - name: truncate terraform plan staging result
-        #   if: github.event_name == 'pull_request' && contains( github.base_ref, 'staging' )
-        #   run: |
-        #     plan=$(cat <<'EOF'
-        #     ${{ format('{0}{1}', steps.plan-staging.outputs.stdout, steps.plan-staging.outputs.stderr) }}
-        #     EOF
-        #     )
-        #     echo "${plan}" | grep -v 'Refreshing state' >> $GITHUB_ENV
-        #     echo "EOF" >> $GITHUB_ENV
-
-
-        # - name: Update Pull Request - Staging
-        #   uses: actions/github-script@v6
-        #   if: github.event_name == 'pull_request' && contains( github.base_ref, 'staging' )
-        #   env:
-        #     PLAN: "terraform\n${{ steps.plan-staging.outputs.stdout }}"
-        #   with:
-        #     github-token: ${{ secrets.GITHUB_TOKEN }}
-        #     script: |
-        #       const output = `#### Terraform Format and Style 🖌\`${{ steps.fmt.outcome }}\`
-        #       #### Terraform Initialization ⚙️\`${{ steps.init.outcome }}\`
-        #       #### Terraform Plan 📖\`${{ steps.plan-staging.outcome }}\`
-        #       #### Terraform Validation 🤖\`${{ steps.validate.outcome }}\`
-
-        #       <details><summary>Show Plan</summary>
-
-        #       \`\`\`\n
-        #       ${process.env.PLAN}
-        #       \`\`\`
-
-        #       </details>
-
-        #       *Pushed by: @${{ github.actor }}, Action: \`${{ github.event_name }}\`*`;
-
-        #       github.rest.issues.createComment({
-        #         issue_number: context.issue.number,
-        #         owner: context.repo.owner,
-        #         repo: context.repo.repo,
-        #         body: output
-        #       })
-        
-        # - name: Terraform Plan Staging Status
-        #   if: steps.plan-staging.outcome == 'failure'
-        #   run: exit 1
-        
         - name: Terraform Apply Staging
           if: github.event_name == 'workflow_dispatch'
           id: infra-apply-staging
@@ -235,103 +161,6 @@ jobs:
           continue-on-error: true
           working-directory: .infra/terraform
 
-        # - uses: actions/github-script@v6
-        #   if: github.event_name == 'pull_request' && contains( github.base_ref, 'master' ) || contains( github.base_ref, 'beta' )
-        #   env:
-        #     PLAN: "terraform\n${{ steps.plan-prod.outputs.stdout }}"
-        #   with:
-        #     github-token: ${{ secrets.ACTIONS_TOKEN }}
-        #     script: |
-        #       const output = `#### Terraform Format and Style 🖌\`${{ steps.fmt.outcome }}\`
-        #       #### Terraform Initialization ⚙️\`${{ steps.init.outcome }}\`
-        #       #### Terraform Validation 🤖\`${{ steps.validate.outcome }}\`
-        #       #### Terraform Plan 📖\`${{ steps.plan-prod.outcome }}\`
-        #       <details><summary>Show Plan</summary>
-        #       \`\`\`\n
-        #       ${process.env.PLAN}
-        #       \`\`\`
-        #       </details>
-        #       *Pushed by: @${{ github.actor }}, Action: \`${{ github.event_name }}\`*`;
-        #       github.rest.issues.createComment({
-        #         issue_number: context.issue.number,
-        #         owner: context.repo.owner,
-        #         repo: context.repo.repo,
-        #         body: output
-        #       })
-
-        # - name: truncate terraform plan beta result
-        #   if: github.event_name == 'pull_request' && contains( github.base_ref, 'beta' )
-        #   run: |
-        #     plan=$(cat <<'EOF'
-        #     ${{ format('{0}{1}', steps.plan-beta.outputs.stdout, steps.plan-beta.outputs.stderr) }}
-        #     EOF
-        #     )
-        #     echo "${plan}" | grep -v 'Refreshing state' >> $GITHUB_ENV
-        #     echo "EOF" >> $GITHUB_ENV
-
-        # - name: create comment from plan beta result
-        #   uses: actions/github-script@0.9.0
-        #   if: github.event_name == 'pull_request' && contains( github.base_ref, 'beta' )
-        #   with:
-        #     github-token: ${{ secrets.GITHUB_TOKEN }}
-        #     script: |
-        #       const output = `#### Terraform Initialization ⚙️\`${{ steps.init.outcome }}\`
-        #       #### Terraform Plan 📖\`${{ steps.plan-beta.outcome }}\`
-              
-        #       <details><summary>Show Plan</summary>
-              
-        #       \`\`\`\n
-        #       ${ process.env.PLAN }
-        #       \`\`\`
-              
-        #       </details>
-              
-        #       *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`, Working Directory: \`${{ inputs.TF_WORK_DIR }}\`, Workflow: \`${{ github.workflow }}\`*`;
-
-        #       github.issues.createComment({
-        #         issue_number: context.issue.number,
-        #         owner: context.repo.owner,
-        #         repo: context.repo.repo,
-        #         body: output
-        #       })```
-
-        # - name: truncate terraform plan prod result
-        #   if: github.event_name == 'pull_request' && contains( github.base_ref, 'master' )
-        #   run: |
-        #     plan=$(cat <<'EOF'
-        #     ${{ format('{0}{1}', steps.plan-prod.outputs.stdout, steps.plan-prod.outputs.stderr) }}
-        #     EOF
-        #     )
-        #     echo "${plan}" | grep -v 'Refreshing state' >> $GITHUB_ENV
-        #     echo "EOF" >> $GITHUB_ENV
-
-        # - name: create comment from plan prod result
-        #   uses: actions/github-script@0.9.0
-        #   if: github.event_name == 'pull_request' && contains( github.base_ref, 'prod' )
-        #   with:
-        #     github-token: ${{ secrets.GITHUB_TOKEN }}
-        #     script: |
-        #       const output = `#### Terraform Initialization ⚙️\`${{ steps.init.outcome }}\`
-        #       #### Terraform Plan 📖\`${{ steps.plan-prod.outcome }}\`
-              
-        #       <details><summary>Show Plan</summary>
-              
-        #       \`\`\`\n
-        #       ${ process.env.PLAN }
-        #       \`\`\`
-              
-        #       </details>
-              
-        #       *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`, Working Directory: \`${{ inputs.TF_WORK_DIR }}\`, Workflow: \`${{ github.workflow }}\`*`;
-
-        #       github.issues.createComment({
-        #         issue_number: context.issue.number,
-        #         owner: context.repo.owner,
-        #         repo: context.repo.repo,
-        #         body: output
-        #       })```
-        
-        
         - name: Terraform Plan Beta Status
           if: steps.plan-beta.outcome == 'failure'
           run: exit 1
