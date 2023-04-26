@@ -70,7 +70,7 @@ jobs:
           working-directory: .infra/terraform
           run: |
             echo "github_event: "${{github.event_name }}
-            echo "github_branch: "${{github.base_ref}}
+            echo "github_branch: "${{github.ref}}
             echo "runner: "${{ inputs.runner }}
             echo "env_check: "${{inputs.env_check}}
             echo "new_stage: "${{ inputs.new_stage }}
