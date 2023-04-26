@@ -76,9 +76,9 @@ jobs:
             echo "new_stage: "${{ inputs.new_stage }}
             echo "stage: "${{env.STAGE}}
             echo "release_version: "${{inputs.release_version}}
-            echo $GITHUB_REF
-            branch=$(git rev-parse --abbrev-ref "$(git rev-parse "${{github.ref}}^{}")")
-            echo "Release source branch: $branch"
+            echo ${{github.ref}}
+            echo ${{github.head_ref}}
+            echo ${{github.base_ref}}
 
         - name: Generate terraform.auto.tfvars for new environment
           if:  contains(fromJson('["true"]'), inputs.new_stage )
