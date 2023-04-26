@@ -78,6 +78,7 @@ jobs:
             echo "release_version: "${{inputs.release_version}}
             if [[ "$GITHUB_REF" == "refs/tags/"* ]]; then
               # This is a tag, so get the branch name from the tag's commit
+              echo $GITHUB_REF
               branch=$(git rev-parse --abbrev-ref "$(git rev-parse "${GITHUB_REF}^{}")")
             else
               # This is a branch, so just extract the branch name
