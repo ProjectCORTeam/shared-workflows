@@ -76,9 +76,6 @@ jobs:
             echo "new_stage: "${{ inputs.new_stage }}
             echo "stage: "${{env.STAGE}}
             echo "release_version: "${{inputs.release_version}}
-            echo ${{github.ref}}
-            echo ${{github.head_ref}}
-            echo ${{github.base_ref}}
 
         - name: Generate terraform.auto.tfvars for new environment
           if:  contains(fromJson('["true"]'), inputs.new_stage )
@@ -173,7 +170,7 @@ jobs:
           run: exit 1
 
         - name: Terraform Apply Beta
-          if: github.event_name == 'release' && contains( github.base_ref, 'beta' )
+          if: github.event_name == 'release' && env.STAGE == 'beta'
           id: infra-apply-beta
           run: terraform apply -auto-approve -input=false -target='module.shared' -target='module.prod["beta"]'
           working-directory: .infra/terraform
