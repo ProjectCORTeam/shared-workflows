@@ -83,14 +83,11 @@ jobs:
           shell: bash
           working-directory: .infra
           run: |
-            jq --argjson new_env '{"new_env": false}' '(.env_settings[]) += $new_env' infra-config.json  > ./terraform/terraform.auto.tfvars.json ; \
-            if [ ${{env.STAGE}} == 'production' ]; then \
-              jq --argjson new_env '{"new_env": false}' '(.env_settings[]) += $new_env' infra-config.json | jq --argjson new_env '{"new_env": ${{ inputs.new_stage }}}' '.env_settings |= map(if .stage == "${{env.STAGE}}" then . + $new_env else . end)' | jq --arg version ${{inputs.release_version}} '(.env_settings[] | select(.stage == "production")) += {release_version: $version}'  > ./terraform/terraform.auto.tfvars.json;\
-              elif [ ${{env.STAGE}} == 'beta' ]; then \
-              jq --argjson new_env '{"new_env": false}' '(.env_settings[]) += $new_env' infra-config.json | jq --argjson new_env '{"new_env": ${{ inputs.new_stage }}}' '.env_settings |= map(if .stage == "${{env.STAGE}}" then . + $new_env else . end)' | jq --arg version ${{inputs.release_version}} '(.env_settings[] | select(.stage == "beta")) += {release_version: $version}'  > ./terraform/terraform.auto.tfvars.json ;\
-              else \
-              jq --argjson new_env '{"new_env": false}' '(.env_settings[]) += $new_env' infra-config.json | jq --argjson new_env '{"new_env": ${{ inputs.new_stage }}}' '.env_settings |= map(if .stage == "${{env.STAGE}}" then . + $new_env else . end)' > ./terraform/terraform.auto.tfvars.json ; \
-              fi
+            if [ ${{env.STAGE}} == 'production' ] || [ ${{env.STAGE}} == 'beta' ]; then \
+              jq --argjson new_env '{"new_env": ${{ inputs.new_stage }}}' --arg commit_id "$(git rev-parse --short HEAD)" --arg version ${{inputs.release_version}} '(.env_settings[]) += {new_env: false} | .env_settings |= map(if .stage == "${{env.STAGE}}" then . += $new_env + {release_version: $version} else . end)' infra-config.json > ./terraform/terraform.auto.tfvars.json              
+            else \
+              jq --argjson new_env '{"new_env": ${{ inputs.new_stage }}}' --arg commit_id "$(git rev-parse --short HEAD)" '(.env_settings[]) += {new_env: false} | .env_settings |= map(if .stage == "${{env.STAGE}}" then . += $new_env else . end)' infra-config.json > ./terraform/terraform.auto.tfvars.json
+            fi
             terraform fmt
             cat ./terraform/terraform.auto.tfvars.json
 
@@ -103,12 +100,10 @@ jobs:
             echo "Release version: "${{inputs.release_version}}
             echo "Commit ID: $(git rev-parse --short HEAD)"
             
-            if [ ${{env.STAGE}} == 'production' ]; then \
-              jq --argjson new_env ${{ inputs.new_stage }} --arg commit_id "$(git rev-parse --short HEAD)" --arg version ${{inputs.release_version}} '.commit_id += $commit_id | .env_settings[] += {new_env: $new_env} | (.env_settings[] | select(.stage == "production")) += {release_version: $version}' infra-config.json > ./terraform/terraform.auto.tfvars.json ; \
-            elif [ ${{env.STAGE}} == 'beta' ]; then \
-              jq --argjson new_env ${{ inputs.new_stage }} --arg commit_id "$(git rev-parse --short HEAD)" --arg version ${{inputs.release_version}} '.commit_id += $commit_id | .env_settings[] += {new_env: $new_env} | (.env_settings[] | select(.stage == "beta")) += {release_version: $version}' infra-config.json > ./terraform/terraform.auto.tfvars.json ; \
+            if [ ${{env.STAGE}} == 'production' ] || [ ${{env.STAGE}} == 'beta' ]; then \
+              jq --argjson new_env '{"new_env": ${{inputs.new_stage}}}' --arg commit_id "$(git rev-parse --short HEAD)" --arg version "${{inputs.release_version}}" '.commit_id += $commit_id | .env_settings[] += $new_env | select(.stage == "${{env.STAGE}}") += {release_version: $version}' infra-config.json > ./terraform/terraform.auto.tfvars.json
             else \
-            jq --argjson new_env ${{ inputs.new_stage }} --arg commit_id $(git rev-parse --short HEAD) '.commit_id += $commit_id | .env_settings[] += {new_env: $new_env}' infra-config.json > ./terraform/terraform.auto.tfvars.json; \
+              jq --argjson new_env '{"new_env": ${{ inputs.new_stage }}}' --arg commit_id $(git rev-parse --short HEAD) '.commit_id += $commit_id | .env_settings[] += $new_env' infra-config.json > ./terraform/terraform.auto.tfvars.json; \
             fi
             terraform fmt
             cat ./terraform/terraform.auto.tfvars.json
