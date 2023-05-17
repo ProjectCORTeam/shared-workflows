@@ -78,8 +78,8 @@ jobs:
             echo "release_version: "${{inputs.release_version}}
 
         - name: Generate terraform.auto.tfvars for environment
-          if:  contains(fromJson('["true"]'), inputs.new_stage )
-          id: tfvars_generator_new
+          # if:  contains(fromJson('["true"]'), inputs.new_stage )
+          id: tfvars_generator
           shell: bash
           working-directory: .infra
           run: |
