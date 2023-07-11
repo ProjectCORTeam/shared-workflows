@@ -119,13 +119,13 @@ jobs:
             echo "PROJECT=$(echo $SERVICE_NAME-production)" >> $GITHUB_ENV; \
             echo "stage=production" >> $GITHUB_OUTPUT; \
           elif [[ $BRANCH_NAME == "master" && ${{ github.event_name }} == "workflow_dispatch" ]]; then \
-            echo "PROJECT=$(echo $SERVICE_NAME-production)" >> $GITHUB_ENV; \
+            echo "PROJECT=$(echo $SERVICE_NAME-${{ inputs.staging_target }})" >> $GITHUB_ENV; \
             echo "stage=staging5" >> $GITHUB_OUTPUT; \
           elif [[ $BRANCH_NAME == "beta" && ${{ github.event_name }} != "workflow_dispatch" ]]; then \
             echo "PROJECT=$(echo $SERVICE_NAME-beta)" >> $GITHUB_ENV; \
             echo "stage=beta" >> $GITHUB_OUTPUT; \
           elif [[ $BRANCH_NAME == "beta" && ${{ github.event_name }} == "workflow_dispatch" ]]; then \
-            echo "PROJECT=$(echo $SERVICE_NAME-beta)" >> $GITHUB_ENV; \
+            echo "PROJECT=$(echo $SERVICE_NAME-${{ inputs.staging_target }})" >> $GITHUB_ENV; \
             echo "stage=${{ inputs.staging_target }}" >> $GITHUB_OUTPUT; \
           else \
             echo "PROJECT=$(echo $SERVICE_NAME-${{ inputs.staging_target }})" >> $GITHUB_ENV; \
