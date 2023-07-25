@@ -200,13 +200,15 @@ jobs:
 
           
           # Check the exit status
-          if [ ${{steps.check-ecr-tag.outcome}} -eq 'failure' ]; then
+          if [ '${{steps.check-ecr-tag.outcome}}' -eq 'failure' ]; then
             echo "Release version is not builded"
             echo "ECR_IMAGE_EXIST=false" >> $GITHUB_ENV;
-          elif [ ${{steps.check-ecr-tag.outcome}} -eq 'success' ]; then
+          elif [ '${{steps.check-ecr-tag.outcome}}' -eq 'success' ]; then
             echo "Release version is already builded"
             echo "ECR_IMAGE_EXIST=true" >> $GITHUB_ENV;
           fi
+
+          echo "ECR_IMAGE_EXIST= "${{env.ECR_IMAGE_EXIST}}
 
       - name: Configure AWS Credentials - CICD
         if: contains(fromJson('["push", "release", "pull_request", "workflow_dispatch"]'), github.event_name)
