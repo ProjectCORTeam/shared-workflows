@@ -63,6 +63,7 @@ jobs:
 
       - name: Get Commit Hash
         id: get-commit-ids
+        if: contains(fromJson('["workflow_dispatch"]'), inputs.trigger_type)
         run: |
           commit_hash=$(git rev-parse ${{ github.ref }})
           echo "COMMIT_HASH=$commit_hash" >> $GITHUB_ENV &&
