@@ -198,10 +198,10 @@ jobs:
           # Check the exit status
           if [ $exit_status -eq 0 ]; then
             echo "Release version is already builded"
-            echo "ecr_image_exist=true" >> $GITHUB_OUTPUT;
+            echo "ECR_IMAGE_EXIST=true" >> $GITHUB_ENV;
           else
             echo "Release version is not builded"
-            echo "ecr_image_exist=false" >> $GITHUB_OUTPUT;
+            echo "ECR_IMAGE_EXIST=false" >> $GITHUB_ENV;
           fi
 
       - name: Configure AWS Credentials - CICD
