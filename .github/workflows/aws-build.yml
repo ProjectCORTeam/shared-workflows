@@ -206,6 +206,10 @@ jobs:
             echo "ECR_IMAGE_EXIST=false" >> $GITHUB_ENV;
           fi
 
+      - name: Check ECR image tag outcome
+        run: |
+          echo "ECR check outcome: "${{steps.check-ecr-tag.outcome}}
+
       - name: Configure AWS Credentials - CICD
         if: contains(fromJson('["push", "release", "pull_request", "workflow_dispatch"]'), github.event_name)
         uses: aws-actions/configure-aws-credentials@v2
