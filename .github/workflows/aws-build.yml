@@ -188,7 +188,7 @@ jobs:
 
       - name: Check ECR image tag
         id: check-ecr-tag
-        #continue-on-error: true
+        continue-on-error: true
         run: |
           ECR_REPOSITORY=$(aws ecr describe-repositories --region ${{ secrets.SHARED_AWS_REGION }} --query 'repositories[?ends_with(repositoryName, `${{ steps.set_project_name.outputs.SERVICE_NAME}}`) == `true`]' | jq ".[0].repositoryName" | tr -d '"')
           echo "ECR Repository: "$ECR_REPOSITORY
