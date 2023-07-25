@@ -230,7 +230,7 @@ jobs:
             }'
 
       - name: Google Chat Notification - With codebuild
-        if: contains(fromJson('["true"]'), steps.check-project.outputs.project_exist ) && contains(fromJson('["push", "release", "workflow_dispatch"]'), github.event_name) && && ${{ steps.check-ecr-tag.outcome == 'failure' }} 
+        if: contains(fromJson('["true"]'), steps.check-project.outputs.project_exist ) && contains(fromJson('["push", "release", "workflow_dispatch"]'), github.event_name) && ${{ steps.check-ecr-tag.outcome == 'failure' }} 
         uses: nakamuraos/google-chat-notifications@v2.1.0
         with:
           title: Image Build
