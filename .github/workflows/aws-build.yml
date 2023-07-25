@@ -253,4 +253,4 @@ jobs:
           echo "stage_check: " ${{ steps.check-project.outputs.project_exist }}
           echo "stage: " ${{ steps.set_project_name.outputs.stage }}
           echo "env_check: " ${{ steps.set_project_name.outcome }}
-          echo "release_version: " ${{ steps.set_project_name.outputs.release_version}}
+          echo "release_version: " ${{ env.RELEASE_VERSION}}
