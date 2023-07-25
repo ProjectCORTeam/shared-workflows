@@ -103,7 +103,7 @@ jobs:
       - name: Set release/branch version - staging
         if: contains(fromJson('["workflow_dispatch"]'), inputs.trigger_type)
         run: |
-          git_hash=$(echo ${{ github.GITHUB_SHA }} | cut -c 1-7)
+          git_hash=${{ github.sha:0:7 }}
           echo "Commit ID: "$git_hash
           RELEASE_VERSION=${{ inputs.staging_target }}
           RELEASE_VERSION=$(echo $RELEASE_VERSION | sed s/staging/v/g)
