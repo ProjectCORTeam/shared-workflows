@@ -53,7 +53,7 @@ jobs:
       stage_check: ${{ steps.check-project.outputs.project_exist }}
       stage: ${{ steps.set_project_name.outputs.stage }}
       env_check: ${{ steps.set_project_name.outcome }}
-      release_version: ${{ steps.set_project_name.outputs.release_version}}
+      release_version: ${{ env.RELEASE_VERSION }}
     steps:
       - name: Checkout
         if: contains(fromJson('["push", "release", "pull_request", "workflow_dispatch"]'), github.event_name)
