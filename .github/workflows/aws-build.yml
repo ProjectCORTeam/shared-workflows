@@ -131,10 +131,10 @@ jobs:
             echo "PROJECT=$(echo $SERVICE_NAME-${{ inputs.staging_target }})" >> $GITHUB_ENV; \
             echo "stage=${{ inputs.staging_target }}" >> $GITHUB_OUTPUT; \
           fi
-          git_hash=$(git rev-parse --short "${{ github.GITHUB_SHA }}")
+          git_hash=$(echo ${{ github.GITHUB_SHA }} | cut -c 1-7)
           echo "release_version=$RELEASE_VERSION-$git_hash" >> $GITHUB_OUTPUT
-      
-      - name: Configure AWS Credentials
+
+      - name: Configure AWS Credentials - CICD
         if: contains(fromJson('["push", "release", "pull_request", "workflow_dispatch"]'), github.event_name)
         uses: aws-actions/configure-aws-credentials@v2
         with:
@@ -161,6 +161,28 @@ jobs:
           echo "codebuild_project=$CODEBUILD" >> $GITHUB_OUTPUT; \
           echo "CODEBUILD_PROJECT=$CODEBUILD" >> $GITHUB_ENV;
           echo $CODEBUILD_PROJECT
+
+      # - name: Configure AWS Credentials - Shared
+      #   if: contains(fromJson('["push", "release", "pull_request", "workflow_dispatch"]'), github.event_name)
+      #   uses: aws-actions/configure-aws-credentials@v2
+      #   with:
+      #     aws-access-key-id: ${{ secrets.SHARED_AWS_ACCESS_KEY_ID }}
+      #     aws-secret-access-key: ${{ secrets.SHARED_AWS_SECRET_ACCESS_KEY }}
+      #     aws-region: ${{ secrets.SHARED_AWS_REGION }}
+
+      # - name: Check ECR image tag
+      #   continue-on-error: true
+      #   run: |
+      #     ECR_REPOSITORY=$(aws ecr describe-repositories --region us-east-2 --query 'repositories[?ends_with(repositoryName, `ms-budgets`) == `true`]' | jq ".[0].repositoryName" | tr -d '"')
+      #     aws ecr describe-images --repository-name $ECR_REPOSITORY --image-ids imageTag=${{ steps.set_project_name.outputs.release_version}}
+      
+      # - name: Configure AWS Credentials - CICD
+      #   if: contains(fromJson('["push", "release", "pull_request", "workflow_dispatch"]'), github.event_name)
+      #   uses: aws-actions/configure-aws-credentials@v2
+      #   with:
+      #     aws-access-key-id: ${{ secrets.CICD_AWS_ACCESS_KEY_ID }}
+      #     aws-secret-access-key: ${{ secrets.CICD_AWS_SECRET_ACCESS_KEY }}
+      #     aws-region: ${{ secrets.CICD_AWS_REGION }}
 
       - name: Run AWS CodeBuild
         id: codebuild
