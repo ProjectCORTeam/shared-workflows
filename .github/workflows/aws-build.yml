@@ -199,7 +199,7 @@ jobs:
           if [ $exit_status -eq 0 ]; then
             echo "Release version is already builded"
             echo "ECR_IMAGE_EXIST=true" >> $GITHUB_ENV;
-          else
+          elif [ $exit_status -eq 254 ]; then
             echo "Release version is not builded"
             echo "ECR_IMAGE_EXIST=false" >> $GITHUB_ENV;
           fi
