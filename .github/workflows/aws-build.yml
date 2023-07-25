@@ -62,9 +62,14 @@ jobs:
           fetch-depth: 0
 
       - name: Get Commit Hash
+        id: get-commit-ids
         run: |
           commit_hash=$(git rev-parse ${{ github.ref }})
+          echo "COMMIT_HASH=$commit_hash" >> $GITHUB_ENV &&
+
           short_commit_hash=$(echo $commit_hash | cut -c 1-7)
+          echo "SHORT_COMMIT_HASH=$short_commit_hash" >> $GITHUB_ENV &&
+
           echo "Commit Hash: $commit_hash"
           echo "Short Commit Hash: $short_commit_hash"
 
@@ -111,12 +116,9 @@ jobs:
         id: set-release-staging
         if: contains(fromJson('["workflow_dispatch"]'), inputs.trigger_type)
         run: |
-          echo "Github SHA: "${{ github.github_sha }}
-          git_hash=$(echo ${{ github.github_sha }} | cut -c 1-7)
-          echo "Commit ID: "$git_hash
           RELEASE_VERSION=${{ inputs.staging_target }}
           RELEASE_VERSION=$(echo $RELEASE_VERSION | sed s/staging/v/g)
-          RELEASE_VERSION=$RELEASE_VERSION".0.0-staging-"$git_hash
+          RELEASE_VERSION=$RELEASE_VERSION".0.0-staging-"${{ steps.get-commit-ids.outputs.SHORT_COMMIT_HASH}}
           echo "RELEASE_VERSION=$RELEASE_VERSION" >> $GITHUB_ENV
           echo "BRANCH_NAME=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
 
