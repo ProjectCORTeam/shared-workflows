@@ -229,7 +229,7 @@ jobs:
 
       - name: Google Chat Notification - With codebuild
         if: contains(fromJson('["true"]'), steps.check-project.outputs.project_exist ) && contains(fromJson('["push", "release", "workflow_dispatch"]'), github.event_name) && env.ECR_IMAGE_EXIST == 'false'
-        uses: nakamuraos/google-chat-notifications@v2.0.1
+        uses: nakamuraos/google-chat-notifications@v2.1.0
         with:
           title: Image Build
           subtitle: ${{ env.RELEASE_VERSION }}
@@ -238,12 +238,12 @@ jobs:
 
       - name: Google Chat Notification - Without codebuild
         if: contains(fromJson('["true"]'), steps.check-project.outputs.project_exist ) && contains(fromJson('["push", "release", "workflow_dispatch"]'), github.event_name)
-        uses: nakamuraos/google-chat-notifications@v2.0.1
+        uses: nakamuraos/google-chat-notifications@v2.1.0
         with:
           title: Image Build
           subtitle: ${{ env.RELEASE_VERSION }}
           webhookUrl: ${{ secrets.GOOGLE_WEBHOOK }}
-          status: 'Skipped'
+          status: 'success'
 
       - name: Output checks
         shell: bash
