@@ -64,7 +64,9 @@ jobs:
       - name: Get Commit Hash
         run: |
           commit_hash=$(git rev-parse ${{ github.ref }})
+          short_commit_hash=$(echo $commit_hash | cut -c 1-7)
           echo "Commit Hash: $commit_hash"
+          echo "Short Commit Hash: $short_commit_hash"
 
       - name: Set release version
         if: contains(fromJson('["release"]'), github.event_name)
