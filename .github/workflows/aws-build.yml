@@ -219,7 +219,7 @@ jobs:
 
       - name: Run AWS CodeBuild
         id: codebuild
-        if: ${{steps.check-project.outputs.project_exist == 'true'}} && contains(fromJson('["push", "release", "workflow_dispatch"]'), github.event_name) && ${{ steps.check-ecr-tag.outcome == 'failure' }}
+        if: ${{steps.check-project.outputs.project_exist == 'true'}} && contains(fromJson('["push", "release", "workflow_dispatch"]'), github.event_name) && ${{ steps.check-ecr-tag.outputs.outcome == 'failure' }}
         uses: dark-mechanicum/aws-codebuild@v1
         env:
           CODEBUILD__sourceVersion: ${{ env.BRANCH_NAME }}
@@ -233,7 +233,7 @@ jobs:
             }'
 
       - name: Google Chat Notification - With codebuild
-        if: contains(fromJson('[true]'), steps.check-project.outputs.project_exist) && contains(fromJson('["push", "release", "workflow_dispatch"]'), github.event_name) && ${{ steps.check-ecr-tag.outcome == 'failure' }}
+        if: ${{steps.check-project.outputs.project_exist == 'true'}} && contains(fromJson('["push", "release", "workflow_dispatch"]'), github.event_name) && ${{ steps.check-ecr-tag.outputs.outcome == 'failure' }}
         uses: nakamuraos/google-chat-notifications@v2.1.0
         with:
           title: Image Build
