@@ -61,6 +61,11 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Get Commit Hash
+        run: |
+          commit_hash=$(git rev-parse ${{ github.ref }})
+          echo "Commit Hash: $commit_hash"
+
       - name: Set release version
         if: contains(fromJson('["release"]'), github.event_name)
         id: prod-release-version-release
@@ -178,6 +183,7 @@ jobs:
 
       - name: Check ECR image tag
         id: check-ecr-tag
+        #continue-on-error: true
         run: |
           ECR_REPOSITORY=$(aws ecr describe-repositories --region ${{ secrets.SHARED_AWS_REGION }} --query 'repositories[?ends_with(repositoryName, `${{ steps.set_project_name.outputs.SERVICE_NAME}}`) == `true`]' | jq ".[0].repositoryName" | tr -d '"')
           echo "ECR Repository: "$ECR_REPOSITORY
