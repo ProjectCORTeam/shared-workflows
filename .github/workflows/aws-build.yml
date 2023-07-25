@@ -194,6 +194,8 @@ jobs:
           echo "ECR Repository: "$ECR_REPOSITORY
           aws ecr describe-images --repository-name $ECR_REPOSITORY --region ${{ secrets.SHARED_AWS_REGION }} --image-ids imageTag=${{ env.RELEASE_VERSION}}
           exit_status=$?
+
+          echo "Status code: "$exit_status
           
           # Check the exit status
           if [ $exit_status -eq 0 ]; then
