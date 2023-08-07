@@ -12,7 +12,7 @@ on:
       runner:
         required: false
         type: string
-        default: 'cor-staging-runners'
+        default: 'ubuntu-latest'
       notifications:
         required: false
         type: boolean
