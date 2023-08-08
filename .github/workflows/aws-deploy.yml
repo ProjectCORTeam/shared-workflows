@@ -126,7 +126,7 @@ jobs:
         
         - name: Terraform Validate
           id: validate
-          run: terraform validate -no-color
+          run: terraform validate
           working-directory: .infra/terraform
 
         - name: Terraform Apply Staging
