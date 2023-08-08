@@ -58,16 +58,11 @@ jobs:
         - name: Setup Terraform
           shell: bash
           run: |
-            mkdir .terraform.d
-            cd .terraform.d
-            echo '{
-              "credentials": {
-                "app.terraform.io": {
-                  "token": "'"${{ secrets.TF_API_TOKEN }}"'"
-                }
-              }
-            }' > credentials.tfrc.json
-            cat credentials.tfrc.json
+            cat >~/.terraformrc <<EOL
+            credentials "app.terraform.io" {
+              token = "${{ secrets.TF_API_TOKEN }}"
+            }
+            EOL
     
         - name: Checkout
           uses: actions/checkout@v3
