@@ -67,6 +67,7 @@ jobs:
                 }
               }
             }' > credentials.tfrc.json
+            cat credentials.tfrc.json
     
         - name: Checkout
           uses: actions/checkout@v3
