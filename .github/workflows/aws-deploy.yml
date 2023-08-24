@@ -94,8 +94,12 @@ jobs:
         - name: Set Global Terraform Variables
           shell: bash
           run: |
-            export TF_VAR_terraform_role_name="${{secrets.TF_VAR_TERRAFORM_ROLE_NAME}}""
-            export TF_VAR_github_token="${{secrets.TF_VAR_GITHUB_TOKEN}}""
+            export TF_VAR_account_id_list=${{secrets.TF_VAR_ACCOUNT_ID_LIST}}
+            export TF_VAR_terraform_role_name="${{secrets.TF_VAR_TERRAFORM_ROLE_NAME}}"
+            export TF_VAR_github_token="${{secrets.TF_VAR_GITHUB_TOKEN}}"
+
+            echo TF_VAR_account_id_list
+            echo TF_VAR_terraform_role_name
 
         - name: Generate terraform.auto.tfvars for environment
           # if:  contains(fromJson('["true"]'), inputs.new_stage )
@@ -146,7 +150,13 @@ jobs:
         - name: Terraform Apply Staging
           if: github.event_name == 'workflow_dispatch'
           id: infra-apply-staging
-          run: terraform apply -auto-approve -input=false -target='module.shared' -target='module.staging["${{ env.STAGE }}"]'
+          run: |
+            terraform apply -auto-approve -input=false \
+            -target='module.shared' \
+            -target='module.staging["${{ env.STAGE }}"]' \
+            -var="account_id_list=${{secrets.TF_VAR_ACCOUNT_ID_LIST}}" \
+            -var="terraform_role_name=${{secrets.TF_VAR_TERRAFORM_ROLE_NAME}}" \
+            -var="github_token=${{secrets.TF_VAR_GITHUB_TOKEN}}"
           working-directory: .infra/terraform
 
         - name: Google Chat Notification - Staging
