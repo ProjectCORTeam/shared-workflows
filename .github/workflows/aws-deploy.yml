@@ -154,7 +154,7 @@ jobs:
             terraform apply -auto-approve -input=false \
             -target='module.shared' \
             -target='module.staging["${{ env.STAGE }}"]' \
-            -var="account_id_list=${{secrets.TF_VAR_ACCOUNT_ID_LIST}}" \
+            -var="account_id_list={prod="228470217310", staging = "175965032279", security = "379257709427", shared = "170071165762" cicd = "882729272159", main = "583588181265", infra = "895242915726" }" \
             -var="terraform_role_name=${{secrets.TF_VAR_TERRAFORM_ROLE_NAME}}" \
             -var="github_token=${{secrets.TF_VAR_GITHUB_TOKEN}}"
           working-directory: .infra/terraform
