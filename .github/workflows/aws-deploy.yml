@@ -94,7 +94,6 @@ jobs:
         - name: Set Global Terraform Variables
           shell: bash
           run: |
-            export TF_VAR_account_id_list=${{secrets.TF_VAR_ACCOUNT_ID_LIST}}
             export TF_VAR_terraform_role_name=${{secrets.TF_VAR_TERRAFORM_ROLE_NAME}}
             export TF_VAR_github_token=${{secrets.TF_VAR_GITHUB_TOKEN}}
 
