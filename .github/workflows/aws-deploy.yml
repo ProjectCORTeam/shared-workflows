@@ -93,7 +93,6 @@ jobs:
 
 
         - name: Generate terraform.auto.tfvars for environment
-          # if:  contains(fromJson('["true"]'), inputs.new_stage )
           id: tfvars_generator
           shell: bash
           working-directory: .infra
