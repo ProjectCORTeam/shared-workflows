@@ -72,6 +72,13 @@ jobs:
             echo "stage: "${{env.STAGE}}
             echo "release_version: "${{inputs.release_version}}
 
+        - name: Configure AWS Credentials - Terraform
+          uses: aws-actions/configure-aws-credentials@v2
+          with:
+            aws-access-key-id: ${{ secrets.TF_AWS_ACCESS_KEY_ID }}
+            aws-secret-access-key: ${{ secrets.TF_AWS_SECRET_ACCESS_KEY }}
+            aws-region: ${{ secrets.TF_AWS_REGION }}
+
         - name: Generate terraform.auto.tfvars for new environment
           if:  contains(fromJson('["true"]'), inputs.new_stage )
           id: tfvars_generator_new
@@ -133,40 +140,6 @@ jobs:
           continue-on-error: true
           working-directory: .infra/terraform
 
-        # - uses: actions/github-script@v6
-        #   if: github.event_name == 'pull_request' && contains( github.base_ref, 'staging' )
-        #   env:
-        #     PLAN: "terraform\n${{ steps.plan-staging.outputs.stdout }}"
-        #   with:
-        #     github-token: ${{ secrets.ACTIONS_TOKEN }}
-        #     script: |
-        #       const output = `#### Terraform Format and Style 🖌\`${{ steps.fmt.outcome }}\`
-        #       #### Terraform Initialization ⚙️\`${{ steps.init.outcome }}\`
-        #       #### Terraform Validation 🤖\`${{ steps.validate.outcome }}\`
-        #       #### Terraform Plan 📖\`${{ steps.plan-staging.outcome }}\`
-        #       <details><summary>Show Plan</summary>
-        #       \`\`\`\n
-        #       ${process.env.PLAN}
-        #       \`\`\`
-        #       </details>
-        #       *Pushed by: @${{ github.actor }}, Action: \`${{ github.event_name }}\`*`;
-        #       github.rest.issues.createComment({
-        #         issue_number: context.issue.number,
-        #         owner: context.repo.owner,
-        #         repo: context.repo.repo,
-        #         body: output
-        #       })
-
-        # - name: truncate terraform plan staging result
-        #   if: github.event_name == 'pull_request' && contains( github.base_ref, 'staging' )
-        #   run: |
-        #     plan=$(cat <<'EOF'
-        #     ${{ format('{0}{1}', steps.plan-staging.outputs.stdout, steps.plan-staging.outputs.stderr) }}
-        #     EOF
-        #     )
-        #     echo "${plan}" | grep -v 'Refreshing state' >> $GITHUB_ENV
-        #     echo "EOF" >> $GITHUB_ENV
-
         - name: create comment from plan staging result
           uses: actions/github-script@0.9.0
           if: github.event_name == 'pull_request' && contains( github.base_ref, 'staging' )
@@ -215,50 +188,28 @@ jobs:
         - name: Terraform Plan Beta
           if: github.event_name == 'pull_request' && contains( github.base_ref, 'beta' )
           id: plan-beta
-          run: terraform plan -no-color -input=false -target='module.shared' -target='module.prod["beta"]'
+          run: |
+            terraform plan -no-color -input=false \
+            -target='module.shared' \
+            -target='module.prod["beta"]' \
+            -var="account_id_list=${{secrets.TF_VAR_ACCOUNT_ID_LIST}}" \
+            -var="terraform_role_name=${{secrets.TF_VAR_TERRAFORM_ROLE_NAME}}" \
+            -var="github_token=${{secrets.TF_VAR_GITHUB_TOKEN}}"
           continue-on-error: true
           working-directory: .infra/terraform
         
         - name: Terraform Plan Prod
           if: github.event_name == 'pull_request' && contains( github.base_ref, 'master' )
           id: plan-prod
-          run: terraform plan -no-color -input=false -target='module.shared' -target='module.prod["production"]'
+          run: |
+            terraform plan -no-color -input=false \
+            -target='module.shared' \
+            -target='module.prod["production"]' \
+            -var="account_id_list=${{secrets.TF_VAR_ACCOUNT_ID_LIST}}" \
+            -var="terraform_role_name=${{secrets.TF_VAR_TERRAFORM_ROLE_NAME}}" \
+            -var="github_token=${{secrets.TF_VAR_GITHUB_TOKEN}}"
           continue-on-error: true
           working-directory: .infra/terraform
-
-        # - uses: actions/github-script@v6
-        #   if: github.event_name == 'pull_request' && contains( github.base_ref, 'master' ) || contains( github.base_ref, 'beta' )
-        #   env:
-        #     PLAN: "terraform\n${{ steps.plan-prod.outputs.stdout }}"
-        #   with:
-        #     github-token: ${{ secrets.ACTIONS_TOKEN }}
-        #     script: |
-        #       const output = `#### Terraform Format and Style 🖌\`${{ steps.fmt.outcome }}\`
-        #       #### Terraform Initialization ⚙️\`${{ steps.init.outcome }}\`
-        #       #### Terraform Validation 🤖\`${{ steps.validate.outcome }}\`
-        #       #### Terraform Plan 📖\`${{ steps.plan-prod.outcome }}\`
-        #       <details><summary>Show Plan</summary>
-        #       \`\`\`\n
-        #       ${process.env.PLAN}
-        #       \`\`\`
-        #       </details>
-        #       *Pushed by: @${{ github.actor }}, Action: \`${{ github.event_name }}\`*`;
-        #       github.rest.issues.createComment({
-        #         issue_number: context.issue.number,
-        #         owner: context.repo.owner,
-        #         repo: context.repo.repo,
-        #         body: output
-        #       })
-
-        # - name: truncate terraform plan beta result
-        #   if: github.event_name == 'pull_request' && contains( github.base_ref, 'beta' )
-        #   run: |
-        #     plan=$(cat <<'EOF'
-        #     ${{ format('{0}{1}', steps.plan-beta.outputs.stdout, steps.plan-beta.outputs.stderr) }}
-        #     EOF
-        #     )
-        #     echo "${plan}" | grep -v 'Refreshing state' >> $GITHUB_ENV
-        #     echo "EOF" >> $GITHUB_ENV
 
         - name: create comment from plan beta result
           uses: actions/github-script@0.9.0
@@ -286,16 +237,6 @@ jobs:
                 body: output
               })```
 
-        # - name: truncate terraform plan prod result
-        #   if: github.event_name == 'pull_request' && contains( github.base_ref, 'master' )
-        #   run: |
-        #     plan=$(cat <<'EOF'
-        #     ${{ format('{0}{1}', steps.plan-prod.outputs.stdout, steps.plan-prod.outputs.stderr) }}
-        #     EOF
-        #     )
-        #     echo "${plan}" | grep -v 'Refreshing state' >> $GITHUB_ENV
-        #     echo "EOF" >> $GITHUB_ENV
-
         - name: create comment from plan prod result
           uses: actions/github-script@0.9.0
           if: github.event_name == 'pull_request' && contains( github.base_ref, 'prod' )
@@ -321,8 +262,7 @@ jobs:
                 repo: context.repo.repo,
                 body: output
               })```
-        
-        
+
         - name: Terraform Plan Beta Status
           if: steps.plan-beta.outcome == 'failure'
           run: exit 1
@@ -334,13 +274,25 @@ jobs:
         - name: Terraform Apply Beta
           if: github.event_name == 'release' && contains( github.base_ref, 'beta' )
           id: infra-apply-beta
-          run: terraform apply -auto-approve -input=false -target='module.shared' -target='module.prod["beta"]'
+          run: |
+            terraform apply -auto-approve -input=false \
+            -target='module.shared' \
+            -target='module.prod["beta"]' \
+            -var="account_id_list=${{secrets.TF_VAR_ACCOUNT_ID_LIST}}" \
+            -var="terraform_role_name=${{secrets.TF_VAR_TERRAFORM_ROLE_NAME}}" \
+            -var="github_token=${{secrets.TF_VAR_GITHUB_TOKEN}}"
           working-directory: .infra/terraform
 
         - name: Terraform Apply Prod
           if: github.event_name == 'release' && contains( github.base_ref, 'master' )
           id: infra-apply-production
-          run: terraform apply -auto-approve -input=false -target='module.shared' -target='module.prod["production"]'
+          run: |
+            terraform apply -auto-approve -input=false \
+            -target='module.shared' \
+            -target='module.prod["production"]' \
+            -var="account_id_list=${{secrets.TF_VAR_ACCOUNT_ID_LIST}}" \
+            -var="terraform_role_name=${{secrets.TF_VAR_TERRAFORM_ROLE_NAME}}" \
+            -var="github_token=${{secrets.TF_VAR_GITHUB_TOKEN}}"
           working-directory: .infra/terraform
 
         - name: Google Chat Notification - Beta
