@@ -3,6 +3,12 @@ name: AWS Build
 on: 
   workflow_call:
     inputs: 
+      trigger_type:
+        required: true
+        type: string
+      staging_target:
+        required: false
+        type: string
       runner:
         required: false
         type: string
@@ -47,13 +53,26 @@ jobs:
       stage_check: ${{ steps.check-project.outputs.project_exist }}
       stage: ${{ steps.set_project_name.outputs.stage }}
       env_check: ${{ steps.set_project_name.outcome }}
-      release_version: ${{ steps.set_project_name.outputs.release_version}}
+      release_version: ${{ env.RELEASE_VERSION }}
     steps:
       - name: Checkout
-        if: contains(fromJson('["push", "release", "pull_request"]'), github.event_name)
+        if: contains(fromJson('["push", "release", "pull_request", "workflow_dispatch"]'), github.event_name)
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
+
+      - name: Get Commit Hash
+        id: get-commit-ids
+        if: contains(fromJson('["workflow_dispatch"]'), inputs.trigger_type)
+        run: |
+          commit_hash=$(git rev-parse ${{ github.ref }})
+          echo "COMMIT_HASH=$commit_hash" >> $GITHUB_ENV &&
+
+          short_commit_hash=$(echo $commit_hash | cut -c 1-7)
+          echo "SHORT_COMMIT_HASH=$short_commit_hash" >> $GITHUB_ENV &&
+
+          echo "Commit Hash: $commit_hash"
+          echo "Short Commit Hash: $short_commit_hash"
 
       - name: Set release version
         if: contains(fromJson('["release"]'), github.event_name)
@@ -95,51 +114,62 @@ jobs:
           fi
 
       - name: Set release/branch version - staging
-        if: contains(fromJson('["push"]'), github.event_name)
+        id: set-release-staging
+        if: contains(fromJson('["workflow_dispatch"]'), inputs.trigger_type)
         run: |
-          RELEASE_VERSION=${GITHUB_REF#refs/*/}
+          RELEASE_VERSION=${{ inputs.staging_target }}
           RELEASE_VERSION=$(echo $RELEASE_VERSION | sed s/staging/v/g)
-          RELEASE_VERSION=$RELEASE_VERSION".0.0-staging"
+          RELEASE_VERSION=$RELEASE_VERSION".0.0-staging-"${{ env.SHORT_COMMIT_HASH}}
+          echo "Final staging release version: "$RELEASE_VERSION
           echo "RELEASE_VERSION=$RELEASE_VERSION" >> $GITHUB_ENV
           echo "BRANCH_NAME=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
 
       - name: Get AWS Codebuild project
-        if: contains(fromJson('["push", "release", "pull_request"]'), github.event_name)
+        if: contains(fromJson('["push", "release", "pull_request", "workflow_dispatch"]'), github.event_name)
         id: set_project_name
         shell: bash
         run: |
           SERVICE_NAME=$(cat .infra/infra-config.json | jq .name | tr -d '"')
-          if [[ $BRANCH_NAME == "master" ]]; \
-          then \
-          echo "PROJECT=$(echo $SERVICE_NAME-production)" >> $GITHUB_ENV; \
-          elif [[ $BRANCH_NAME == "beta" ]];\
-          then \
-          echo "PROJECT=$(echo $SERVICE_NAME-beta)" >> $GITHUB_ENV; \
+          echo "SERVICE_NAME=$SERVICE_NAME" >> $GITHUB_OUTPUT;
+          if [[ $BRANCH_NAME == "master" && ${{ github.event_name }} != "workflow_dispatch" ]]; then \
+            echo "PROJECT=$(echo $SERVICE_NAME-production)" >> $GITHUB_ENV; \
+            echo "stage=production" >> $GITHUB_OUTPUT; \
+          elif [[ $BRANCH_NAME == "master" && ${{ github.event_name }} == "workflow_dispatch" ]]; then \
+            echo "PROJECT=$(echo $SERVICE_NAME-${{ inputs.staging_target }})" >> $GITHUB_ENV; \
+            echo "stage=${{ inputs.staging_target }}" >> $GITHUB_OUTPUT; \
+          elif [[ $BRANCH_NAME == "beta" && ${{ github.event_name }} != "workflow_dispatch" ]]; then \
+            echo "PROJECT=$(echo $SERVICE_NAME-beta)" >> $GITHUB_ENV; \
+            echo "stage=beta" >> $GITHUB_OUTPUT; \
+          elif [[ $BRANCH_NAME == "beta" && ${{ github.event_name }} == "workflow_dispatch" ]]; then \
+            echo "PROJECT=$(echo $SERVICE_NAME-${{ inputs.staging_target }})" >> $GITHUB_ENV; \
+            echo "stage=${{ inputs.staging_target }}" >> $GITHUB_OUTPUT; \
           else \
-          echo "PROJECT=$(echo $SERVICE_NAME-$BRANCH_NAME)" >> $GITHUB_ENV; \
+            echo "PROJECT=$(echo $SERVICE_NAME-${{ inputs.staging_target }})" >> $GITHUB_ENV; \
+            echo "stage=${{ inputs.staging_target }}" >> $GITHUB_OUTPUT; \
           fi
-          echo "stage=$BRANCH_NAME" >> $GITHUB_OUTPUT
-          echo "release_version=$RELEASE_VERSION" >> $GITHUB_OUTPUT
-      
-      - name: Configure AWS Credentials
-        if: contains(fromJson('["push", "release", "pull_request"]'), github.event_name)
-        uses: aws-actions/configure-aws-credentials@v1
+          git_hash=$(echo ${{ github.github_sha }} | cut -c 1-7)
+          echo "Commit ID: "$git_hash
+          echo "release_version=$RELEASE_VERSION-$git_hash" >> $GITHUB_OUTPUT
+
+      - name: Configure AWS Credentials - CICD
+        if: contains(fromJson('["push", "release", "pull_request", "workflow_dispatch"]'), github.event_name)
+        uses: aws-actions/configure-aws-credentials@v2
         with:
           aws-access-key-id: ${{ secrets.CICD_AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.CICD_AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.CICD_AWS_REGION }}
 
       - name: Check if project exists
-        if: contains(fromJson('["push", "release", "pull_request"]'), github.event_name)
+        if: contains(fromJson('["push", "release", "pull_request", "workflow_dispatch"]'), github.event_name)
         id: check-project
         shell: bash
         run: |
-          CODEBUILD=$(aws codebuild list-projects --region ${{ secrets.CICD_AWS_REGION }} --query 'projects[?contains(@,`${{ env.PROJECT }}`) == `true`]' | jq ".[0]" | tr -d '"')
+          CODEBUILD=$(aws codebuild list-projects --region ${{ secrets.CICD_AWS_REGION }} --query 'projects[?ends_with(@,`${{ env.PROJECT }}`) == `true`]' | jq ".[0]" | tr -d '"')
           echo "Codebuild project: "$CODEBUILD
           if [[ $CODEBUILD != "null" ]]; \
           then \
             echo "new_stage=false" >> $GITHUB_OUTPUT; \
-            echo "project_exis=:true" >> $GITHUB_OUTPUT; \
+            echo "project_exist=true" >> $GITHUB_OUTPUT; \
           elif [[ $CODEBUILD == "null" ]]; \
           then \
             echo "project_exist=false" >> $GITHUB_OUTPUT; \
@@ -148,26 +178,78 @@ jobs:
           echo "codebuild_project=$CODEBUILD" >> $GITHUB_OUTPUT; \
           echo "CODEBUILD_PROJECT=$CODEBUILD" >> $GITHUB_ENV;
           echo $CODEBUILD_PROJECT
-        
+
+      - name: Configure AWS Credentials - Shared
+        if: contains(fromJson('["push", "release", "pull_request", "workflow_dispatch"]'), github.event_name)
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.SHARED_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.SHARED_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.SHARED_AWS_REGION }}
+
+      - name: Check ECR image tag
+        id: check-ecr-tag
+        continue-on-error: true
+        run: |
+          ECR_REPOSITORY=$(aws ecr describe-repositories --region ${{ secrets.SHARED_AWS_REGION }} --query 'repositories[?ends_with(repositoryName, `${{ steps.set_project_name.outputs.SERVICE_NAME}}`) == `true`]' | jq ".[0].repositoryName" | tr -d '"')
+          echo "ECR Repository: "$ECR_REPOSITORY
+          aws ecr describe-images --repository-name $ECR_REPOSITORY --region ${{ secrets.SHARED_AWS_REGION }} --image-ids imageTag=${{ env.RELEASE_VERSION}}
+
+      - name: Check ECR image tag outcome
+        run: |
+          echo "ECR check outcome: "${{steps.check-ecr-tag.outcome}}
+
+          # Check the exit status
+          if [ '${{steps.check-ecr-tag.outcome}}' == 'failure' ]; then
+            echo "Release version is not builded"
+            echo "ECR_IMAGE_EXIST=false" >> $GITHUB_ENV;
+          elif [ '${{steps.check-ecr-tag.outcome}}' == 'success' ]; then
+            echo "Release version is already builded"
+            echo "ECR_IMAGE_EXIST=true" >> $GITHUB_ENV;
+          fi
+
+          echo "ECR_IMAGE_EXIST= "${{env.ECR_IMAGE_EXIST}}
+
+      - name: Configure AWS Credentials - CICD
+        if: contains(fromJson('["push", "release", "pull_request", "workflow_dispatch"]'), github.event_name)
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.CICD_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.CICD_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.CICD_AWS_REGION }}
+
       - name: Run AWS CodeBuild
         id: codebuild
-        if: contains(fromJson('["true"]'), steps.check-project.outputs.project_exist ) && contains(fromJson('["push", "release"]'), github.event_name)
-        uses: aws-actions/aws-codebuild-run-build@v1
-        with:
-          project-name: ${{ env.CODEBUILD_PROJECT }}
-          env-vars-for-codebuild: |
-            RELEASE_VERSION
+        if: contains(fromJson('["true"]'), steps.check-project.outputs.project_exist) && contains(fromJson('["push", "release", "workflow_dispatch"]'), github.event_name) && contains(fromJson('["failure"]'), steps.check-ecr-tag.outcome)
+        uses: dark-mechanicum/aws-codebuild@v1
         env:
-          RELEASE_VERSION: ${{ env.RELEASE_VERSION }}
+          CODEBUILD__sourceVersion: ${{ env.BRANCH_NAME }}
+          CODEBUILD__logsConfigOverride__cloudWatchLogs__status: 'ENABLED'
+        with:
+          projectName: ${{ env.CODEBUILD_PROJECT }}
+          buildspec: '{
+              "environmentVariablesOverride":[
+                { "name":"RELEASE_VERSION", "value":"${{ env.RELEASE_VERSION }}", "type": "PLAINTEXT" }
+              ]
+            }'
 
-      - name: Google Chat Notification
-        if: contains(fromJson('["true"]'), steps.check-project.outputs.project_exist ) && contains(fromJson('["push", "release"]'), github.event_name)
-        uses: nakamuraos/google-chat-notifications@v2.0.1
+      - name: Google Chat Notification - With codebuild
+        if: contains(fromJson('["true"]'), steps.check-project.outputs.project_exist) && contains(fromJson('["push", "release", "workflow_dispatch"]'), github.event_name) && contains(fromJson('["failure"]'), steps.check-ecr-tag.outcome)
+        uses: nakamuraos/google-chat-notifications@v2.1.0
         with:
           title: Image Build
           subtitle: ${{ env.RELEASE_VERSION }}
           webhookUrl: ${{ secrets.GOOGLE_WEBHOOK }}
           status: ${{ steps.codebuild.outcome }}
+
+      - name: Google Chat Notification - Without codebuild
+        if: contains(fromJson('["true"]'), steps.check-project.outputs.project_exist ) && contains(fromJson('["push", "release", "workflow_dispatch"]'), github.event_name) && contains(fromJson('["success"]'), steps.check-ecr-tag.outcome)
+        uses: nakamuraos/google-chat-notifications@v2.1.0
+        with:
+          title: Image Build
+          subtitle: ${{ env.RELEASE_VERSION }}
+          webhookUrl: ${{ secrets.GOOGLE_WEBHOOK }}
+          status: 'success'
 
       - name: Output checks
         shell: bash
@@ -177,4 +259,4 @@ jobs:
           echo "stage_check: " ${{ steps.check-project.outputs.project_exist }}
           echo "stage: " ${{ steps.set_project_name.outputs.stage }}
           echo "env_check: " ${{ steps.set_project_name.outcome }}
-          echo "release_version: " ${{ steps.set_project_name.outputs.release_version}}
+          echo "release_version: " ${{ env.RELEASE_VERSION}}

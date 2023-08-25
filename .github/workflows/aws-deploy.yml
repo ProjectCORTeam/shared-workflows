@@ -3,6 +3,9 @@ name: AWS Build
 on: 
   workflow_call:
     inputs: 
+      trigger_type:
+        required: true
+        type: string
       runner:
         required: false
         type: string
@@ -66,6 +69,8 @@ jobs:
           shell: bash
           working-directory: .infra/terraform
           run: |
+            echo "github_event: "${{github.event_name }}
+            echo "github_branch: "${{github.ref}}
             echo "runner: "${{ inputs.runner }}
             echo "env_check: "${{inputs.env_check}}
             echo "new_stage: "${{ inputs.new_stage }}
@@ -85,29 +90,10 @@ jobs:
           shell: bash
           working-directory: .infra
           run: |
-            if [ ${{env.STAGE}} == 'production' ]; then \
-              jq --argjson new_env ${{ inputs.new_stage }} '(.env_settings[]) += {new_env: $new_env}' infra-config.json  | jq --arg version ${{inputs.release_version}} '(.env_settings[] | select(.stage == "production")) += {release_version: $version}'  > ./terraform/terraform.auto.tfvars.json;\
-            elif [ ${{env.STAGE}} == 'beta' ]; then \
-              jq --argjson new_env ${{ inputs.new_stage }} '(.env_settings[]) += {new_env: $new_env}' infra-config.json  | jq --arg version ${{inputs.release_version}} '(.env_settings[] | select(.stage == "beta")) += {release_version: $version}'  > ./terraform/terraform.auto.tfvars.json ;\
+            if [ ${{env.STAGE}} == 'production' ] || [ ${{env.STAGE}} == 'beta' ]; then \
+              jq --argjson new_env '{"new_env": ${{ inputs.new_stage }}}' --arg commit_id "$(git rev-parse --short HEAD)" --arg version ${{inputs.release_version}} '.commit_id += $commit_id | (.env_settings[]) += {new_env: false} | .env_settings |= map(if .stage == "${{env.STAGE}}" then . += $new_env + {release_version: $version} else . end)' infra-config.json > ./terraform/terraform.auto.tfvars.json              
             else \
-              jq --argjson new_env ${{ inputs.new_stage }} '(.env_settings[]) += {new_env: $new_env}' infra-config.json  > ./terraform/terraform.auto.tfvars.json ; \
-            fi
-            terraform fmt
-            cat ./terraform/terraform.auto.tfvars.json
-
-        - name: Generate terraform.auto.tfvars for existing environment
-          if:  contains(fromJson('["false"]'), inputs.new_stage )
-          id: tfvars_generator_existing
-          shell: bash
-          working-directory: .infra
-          run: |
-            echo "Release version: "${{inputs.release_version}}
-            if [ ${{env.STAGE}} == 'production' ]; then \
-              jq --argjson new_env ${{ inputs.new_stage }} '(.env_settings[]) += {new_env: $new_env}' infra-config.json  | jq --arg version ${{inputs.release_version}} '(.env_settings[] | select(.stage == "production")) += {release_version: $version}'  > ./terraform/terraform.auto.tfvars.json ; \
-            elif [ ${{env.STAGE}} == 'beta' ]; then \
-              jq --argjson new_env ${{ inputs.new_stage }} '(.env_settings[]) += {new_env: $new_env}' infra-config.json  | jq --arg version ${{inputs.release_version}} '(.env_settings[] | select(.stage == "beta")) += {release_version: $version}'  > ./terraform/terraform.auto.tfvars.json ; \
-            else \
-              jq --argjson new_env ${{ inputs.new_stage }} '(.env_settings[]) += {new_env: $new_env}' infra-config.json  > ./terraform/terraform.auto.tfvars.json ; \
+              jq --argjson new_env '{"new_env": ${{ inputs.new_stage }}}' --arg commit_id "$(git rev-parse --short HEAD)" '.commit_id += $commit_id | (.env_settings[]) += {new_env: false} | .env_settings |= map(if .stage == "${{env.STAGE}}" then . += $new_env else . end)' infra-config.json > ./terraform/terraform.auto.tfvars.json
             fi
             terraform fmt
             cat ./terraform/terraform.auto.tfvars.json
@@ -115,7 +101,7 @@ jobs:
         - name: Setup Terraform
           uses: hashicorp/setup-terraform@v2
           with:
-            terraform_version: 1.2.9
+            terraform_version: 1.5.3
             cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
 
         - name: Terraform Format
@@ -171,14 +157,14 @@ jobs:
           run: exit 1
         
         - name: Terraform Apply Staging
-          if: github.event_name == 'push' && contains(github.ref, 'staging')
+          if: github.event_name == 'workflow_dispatch'
           id: infra-apply-staging
           run: terraform apply -auto-approve -input=false -target='module.shared' -target='module.staging["${{ env.STAGE }}"]'
           working-directory: .infra/terraform
 
         - name: Google Chat Notification - Staging
-          if: github.event_name == 'push' && contains(github.ref, 'staging')
-          uses: nakamuraos/google-chat-notifications@v2.0.1
+          if: github.event_name == 'workflow_dispatch'
+          uses: nakamuraos/google-chat-notifications@v2.1.0
           with:
             title: Infrastructure Apply
             subtitle: Staging - ${{ env.STAGE }}
@@ -272,7 +258,7 @@ jobs:
           run: exit 1
 
         - name: Terraform Apply Beta
-          if: github.event_name == 'release' && contains( github.base_ref, 'beta' )
+          if: github.event_name == 'release' && env.STAGE == 'beta'
           id: infra-apply-beta
           run: |
             terraform apply -auto-approve -input=false \
@@ -284,7 +270,7 @@ jobs:
           working-directory: .infra/terraform
 
         - name: Terraform Apply Prod
-          if: github.event_name == 'release' && contains( github.base_ref, 'master' )
+          if: github.event_name == 'release' && env.STAGE == 'production'
           id: infra-apply-production
           run: |
             terraform apply -auto-approve -input=false \
@@ -296,8 +282,8 @@ jobs:
           working-directory: .infra/terraform
 
         - name: Google Chat Notification - Beta
-          if: github.event_name == 'release' && contains( github.base_ref, 'beta' )
-          uses: nakamuraos/google-chat-notifications@v2.0.1
+          if: github.event_name == 'release' && env.STAGE == 'beta'
+          uses: nakamuraos/google-chat-notifications@v2.1.0
           with:
             title: Infrastructure Apply
             subtitle: ${{ env.STAGE }}
@@ -305,8 +291,8 @@ jobs:
             status: ${{ steps.infra-apply-beta.outcome }}
 
         - name: Google Chat Notification - Production
-          if: github.event_name == 'release' && contains( github.base_ref, 'master' )
-          uses: nakamuraos/google-chat-notifications@v2.0.1
+          if: github.event_name == 'release' && env.STAGE == 'production'
+          uses: nakamuraos/google-chat-notifications@v2.1.0
           with:
             title: Infrastructure Apply
             subtitle: ${{ env.STAGE }}
