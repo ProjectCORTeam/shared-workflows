@@ -52,6 +52,7 @@ jobs:
     outputs:
       SERVICE_NAME: ${{ steps.set-project-name.outputs.SERVICE_NAME }}
       PROJECT: ${{ steps.set-project-name.outputs.PROJECT }}
+      CODEBUILD_PROJECT: ${{ steps.check-project.outputs.CODEBUILD_PROJECT }}
       ENVIRONMENT: ${{ steps.stage.outputs.ENVIRONMENT }}
       STAGE: ${{ steps.stage.outputs.STAGE }}
       STAGE_SHORT: ${{ steps.stage.outputs.STAGE_SHORT }}
@@ -86,10 +87,12 @@ jobs:
           tag=$(git describe --exact-match --tags HEAD)
           if [[ -n "$tag" ]]; then
               echo "Current commit has a tag: $tag"
+              echo "RELEASE_TAG=$tag"
               echo "RELEASE_TAG=$tag" >> $GITHUB_ENV
               echo "RELEASE_TAG=$tag" >> $GITHUB_OUTPUT
           else
               echo "Current commit does not have a tag"
+              echo "RELEASE_TAG=null"
               echo "RELEASE_TAG=null" >> $GITHUB_ENV
               echo "RELEASE_TAG=null" >> $GITHUB_OUTPUT
           fi
@@ -117,6 +120,7 @@ jobs:
         id: extract_branch
         shell: bash
         run: |
+          echo "BRANCH_NAME=$GITHUB_REF_NAME" 
           echo "BRANCH_NAME=$GITHUB_REF_NAME" >> $GITHUB_ENV 
           echo "BRANCH_NAME=$GITHUB_REF_NAME" >> $GITHUB_OUTPUT 
 
@@ -125,8 +129,10 @@ jobs:
         shell: bash
         run: |
           SERVICE_NAME=$(cat .infra/infra-config.json | jq .name | tr -d '"')
+          echo "SERVICE_NAME=$SERVICE_NAME"
           echo "SERVICE_NAME=$SERVICE_NAME" >> $GITHUB_ENV
           echo "SERVICE_NAME=$SERVICE_NAME" >> $GITHUB_OUTPUT
+          echo "PROJECT=$(echo $SERVICE_NAME-${{ inputs.environment }})"
           echo "PROJECT=$(echo $SERVICE_NAME-${{ inputs.environment }})" >> $GITHUB_ENV
           echo "PROJECT=$(echo $SERVICE_NAME-${{ inputs.environment }})" >> $GITHUB_OUTPUT
 
@@ -155,16 +161,20 @@ jobs:
           echo "Codebuild project: "$CODEBUILD
           if [[ $CODEBUILD != "null" ]]; \
           then \
+            echo "new_stage=false"; \
             echo "new_stage=false" >> $GITHUB_OUTPUT; \
+            echo "project_exist=true"; \
             echo "project_exist=true" >> $GITHUB_OUTPUT; \
           elif [[ $CODEBUILD == "null" ]]; \
           then \
+            echo "project_exist=false"; \
             echo "project_exist=false" >> $GITHUB_OUTPUT; \
+            echo "new_stage=true"; \
             echo "new_stage=true" >> $GITHUB_OUTPUT; \
           fi
-          echo "codebuild_project=$CODEBUILD" >> $GITHUB_OUTPUT; \
-          echo "CODEBUILD_PROJECT=$CODEBUILD" >> $GITHUB_ENV;
-          echo $CODEBUILD_PROJECT
+          echo "CODEBUILD_PROJECT=$CODEBUILD"
+          echo "CODEBUILD_PROJECT=$CODEBUILD" >> $GITHUB_OUTPUT
+          echo "CODEBUILD_PROJECT=$CODEBUILD" >> $GITHUB_ENV
 
   # aws-build:
   #   runs-on: ${{ inputs.runner }}
