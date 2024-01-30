@@ -176,9 +176,6 @@ jobs:
           echo "CODEBUILD_PROJECT=$CODEBUILD" >> $GITHUB_OUTPUT
           echo "CODEBUILD_PROJECT=$CODEBUILD" >> $GITHUB_ENV
 
-      - name: Set codebuild_project environment variable
-        run: |
-          echo "::set-env name=CODEBUILD_PROJECT::${{ github.env.CODEBUILD_PROJECT }}"
   aws-build:
     runs-on: ${{ inputs.runner }}
     name: AWS CodeBuild Trigger and Helm Push
@@ -253,17 +250,24 @@ jobs:
           echo "CODEBUILD_SOURCE=$CODEBUILD_SOURCE"
           echo "CODEBUILD_SOURCE=$CODEBUILD_SOURCE" >> $GITHUB_ENV 
           echo "CODEBUILD_SOURCE=$CODEBUILD_SOURCE" >> $GITHUB_OUTPUT
-          
+
+      - name: Get Codebuild Project Name
+        id: get-project-name
+        if: needs.codebuild-check.outputs.project_exist
+        shell: bash
+        run: |
+          CODEBUILD=$(aws codebuild list-projects --region ${{ secrets.CICD_AWS_REGION }} --query 'projects[?ends_with(@,`${{ needs.sets-variables.outputs.PROJECT }}`) == `true`]' | jq ".[0]" | tr -d '"')
+          echo "CODEBUILD_PROJECT=$CODEBUILD" >> $GITHUB_ENV
 
       - name: Run AWS CodeBuild
         id: codebuild
         if: needs.codebuild-check.outputs.project_exist
         uses: dark-mechanicum/aws-codebuild@v1
         env:
-          CODEBUILD__sourceVersion: ${{ env.CODEBUILD_SOURCE }}
+          CODEBUILD__sourceVersion: ${{ github.env.CODEBUILD_SOURCE }}
           CODEBUILD__logsConfigOverride__cloudWatchLogs__status: 'ENABLED'
         with:
-          projectName: ${{ needs.codebuild-check.outputs.codebuild_project }}
+          projectName: ${{ github.env.CODEBUILD_PROJECT }}
           buildspec: '{
               "environmentVariablesOverride":[
                 {"name":"RELEASE_VERSION","value":"${{ env.RELEASE_VERSION }}","type": "PLAINTEXT"}
