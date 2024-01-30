@@ -50,14 +50,15 @@ jobs:
     runs-on: ${{ inputs.runner }}
     name: Sets Variables
     outputs:
-      SERVICE_NAME: ${{ steps.set_project_name.outputs.SERVICE_NAME }}
-      PROJECT: ${{ steps.set_project_name.outputs.PROJECT }}
+      SERVICE_NAME: ${{ steps.set-project-name.outputs.SERVICE_NAME }}
+      PROJECT: ${{ steps.set-project-name.outputs.PROJECT }}
       ENVIRONMENT: ${{ steps.stage.outputs.ENVIRONMENT }}
       STAGE: ${{ steps.stage.outputs.STAGE }}
       STAGE_SHORT: ${{ steps.stage.outputs.STAGE_SHORT }}
       COMMIT_HASH: ${{ steps.get-commit-ids.outputs.COMMIT_HASH }}
       SHORT_COMMIT_HASH: ${{ steps.get-commit-ids.outputs.SHORT_COMMIT_HASH }}
       RELEASE_TAG: ${{ steps.version-tag.outputs.RELEASE_TAG }}
+      DEPLOYMENT_TYPE: ${{ steps.get-deployment-type.outputs.RELEASE_TAG }}
     steps:   
       - name: Checkout
         uses: actions/checkout@v4
@@ -118,7 +119,7 @@ jobs:
           echo "BRANCH_NAME=$GITHUB_REF_NAME" >> $GITHUB_ENV 
 
       - name: Get AWS Codebuild project
-        id: set_project_name
+        id: set-project-name
         shell: bash
         run: |
           SERVICE_NAME=$(cat .infra/infra-config.json | jq .name | tr -d '"')
@@ -130,7 +131,7 @@ jobs:
           fi
 
       - name: Get Deployment Type
-        id: get_deployment_type
+        id: get-deployment-type
         shell: bash
         run: |
           DEPLOYMENT_TYPE=$(cat .infra/infra-config.json | jq .deployment_type | tr -d '"')
