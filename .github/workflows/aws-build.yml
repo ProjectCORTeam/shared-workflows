@@ -58,7 +58,6 @@ jobs:
       COMMIT_HASH: ${{ steps.get-commit-ids.outputs.COMMIT_HASH }}
       SHORT_COMMIT_HASH: ${{ steps.get-commit-ids.outputs.SHORT_COMMIT_HASH }}
       RELEASE_TAG: ${{ steps.version-tag.outputs.RELEASE_TAG }}
-      DEPLOYMENT_TYPE: ${{ steps.get-deployment-type.outputs.RELEASE_TAG }}
     steps:   
       - name: Checkout
         uses: actions/checkout@v4
@@ -88,9 +87,11 @@ jobs:
           if [[ -n "$tag" ]]; then
               echo "Current commit has a tag: $tag"
               echo "RELEASE_TAG=$tag" >> $GITHUB_ENV
+              echo "RELEASE_TAG=$tag" >> $GITHUB_OUTPUT
           else
               echo "Current commit does not have a tag"
               echo "RELEASE_TAG=null" >> $GITHUB_ENV
+              echo "RELEASE_TAG=null" >> $GITHUB_OUTPUT
           fi
 
       - name: Get stage
@@ -117,6 +118,7 @@ jobs:
         shell: bash
         run: |
           echo "BRANCH_NAME=$GITHUB_REF_NAME" >> $GITHUB_ENV 
+          echo "BRANCH_NAME=$GITHUB_REF_NAME" >> $GITHUB_OUTPUT 
 
       - name: Get AWS Codebuild project
         id: set-project-name
@@ -124,18 +126,14 @@ jobs:
         run: |
           SERVICE_NAME=$(cat .infra/infra-config.json | jq .name | tr -d '"')
           echo "SERVICE_NAME=$SERVICE_NAME" >> $GITHUB_ENV
+          echo "SERVICE_NAME=$SERVICE_NAME" >> $GITHUB_OUTPUT
           if [[ ${{startsWith(inputs.environment, 'staging')}} ]]; then
             echo "PROJECT=$(echo $SERVICE_NAME-all)" >> $GITHUB_ENV
+            echo "PROJECT=$(echo $SERVICE_NAME-all)" >> $GITHUB_OUTPUT
           else
-            echo "PROJECT=$(echo $SERVICE_NAME-${{ inputs.environment }})" >> $GITHUB_ENV
+          echo "PROJECT=$(echo $SERVICE_NAME-${{ inputs.environment }})" >> $GITHUB_ENV
+          echo "PROJECT=$(echo $SERVICE_NAME-${{ inputs.environment }})" >> $GITHUB_OUTPUT
           fi
-
-      - name: Get Deployment Type
-        id: get-deployment-type
-        shell: bash
-        run: |
-          DEPLOYMENT_TYPE=$(cat .infra/infra-config.json | jq .deployment_type | tr -d '"')
-          echo "DEPLOYMENT_TYPE=$DEPLOYMENT_TYPE" >> $GITHUB_ENV
 
   codebuild-check:
     runs-on: ${{ inputs.runner }}
