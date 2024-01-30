@@ -238,27 +238,20 @@ jobs:
           aws-secret-access-key: ${{ secrets.CICD_AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.CICD_AWS_REGION }}
 
-  #     - name: Run AWS CodeBuild
-  #       id: codebuild
-  #       if: contains(fromJson('["true"]'), steps.check-project.outputs.project_exist)
-  #       uses: dark-mechanicum/aws-codebuild@v1
-  #       env:
-  #         CODEBUILD__sourceVersion: ${{ env.BRANCH_NAME }}
-  #         CODEBUILD__logsConfigOverride__cloudWatchLogs__status: 'ENABLED'
-  #       with:
-  #         projectName: ${{ env.CODEBUILD_PROJECT }}
-  #         buildspec: '{
-  #             "environmentVariablesOverride":[
-  #               {"name": "ENVIRONMENT","value": "staging","type": "PLAINTEXT"},
-  #               {"name": "ENVIRONMENT_SHORT","value": "st","type": "PLAINTEXT"},
-  #               {"name": "STAGE","value": "${{ env.STAGE }}","type": "PLAINTEXT"},
-  #               {"name": "RELEASE_TAG","value": "${{ env.RELEASE_TAG }}","type": "PLAINTEXT"},
-  #               {"name": "CRONJOBS","value": "False","type": "PLAINTEXT"},
-  #               {"name": "CLEAN_CACHE","value": "${{ inputs.clean_cache }}","type": "PLAINTEXT"},
-  #               {"name": "ENVS_PARAMETER_ROLE","value": "${{ vars.ENVS_PARAMETER_ROLE_STAGING }}","type": "PLAINTEXT"},
-  #               {"name": "ENVS_PARAMETER","value": "${{ vars.ENVS_PARAMETER_STAGING }}","type": "PLAINTEXT"}
-  #             ]
-  #           }'
+      - name: Run AWS CodeBuild
+        id: codebuild
+        if: contains(fromJson('["true"]'), steps.check-project.outputs.project_exist)
+        uses: dark-mechanicum/aws-codebuild@v1
+        env:
+          CODEBUILD__sourceVersion: ${{ env.BRANCH_NAME }}
+          CODEBUILD__logsConfigOverride__cloudWatchLogs__status: 'ENABLED'
+        with:
+          projectName: ${{ env.CODEBUILD_PROJECT }}
+          buildspec: '{
+              "environmentVariablesOverride":[
+                {"name":"RELEASE_VERSION","value":"${{ env.RELEASE_VERSION }}","type": "PLAINTEXT"}
+              ]
+            }'
 
   #     - name: Google Chat Notification - With codebuild
   #       if: contains(fromJson('["true"]'), steps.check-project.outputs.project_exist) && contains(fromJson('["push", "release", "workflow_dispatch"]'), github.event_name) && contains(fromJson('["failure"]'), steps.check-ecr-tag.outcome)
