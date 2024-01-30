@@ -18,11 +18,6 @@ on:
         type: boolean
         default: true
         description: "Enable notifications to cloud or team owner flag"
-      trunk_deployment:
-        required: true
-        type: boolean
-        default: false
-        description: "Git deployment style, trunk or gitflow"
     outputs:
       new_stage:
         description: "New stage deployment check flag"
@@ -133,6 +128,13 @@ jobs:
           else
             echo "PROJECT=$(echo $SERVICE_NAME-${{ inputs.environment }})" >> $GITHUB_ENV
           fi
+
+      - name: Get Deployment Type
+        id: get_deployment_type
+        shell: bash
+        run: |
+          DEPLOYMENT_TYPE=$(cat .infra/infra-config.json | jq .deployment_type | tr -d '"')
+          echo "DEPLOYMENT_TYPE=$DEPLOYMENT_TYPE" >> $GITHUB_ENV
 
   codebuild-check:
     runs-on: ${{ inputs.runner }}
