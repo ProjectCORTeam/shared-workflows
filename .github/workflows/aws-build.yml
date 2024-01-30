@@ -141,9 +141,9 @@ jobs:
     name: Codebuild Project Checks
     needs: sets-variables
     outputs:
-      new_stage: ${{ steps.check-project.new_stage }}
-      project_exist: ${{ steps.check-project.project_exist }}
-      codebuild_project: ${{ steps.check-project.codebuild_project }}
+      new_stage: ${{ steps.check-project.outputs.new_stage }}
+      project_exist: ${{ steps.check-project.outputs.project_exist }}
+      codebuild_project: ${{ steps.check-project.outputs.codebuild_project }}
       
     steps:
       - name: Configure AWS Credentials - CICD
@@ -254,7 +254,7 @@ jobs:
 
       - name: Run AWS CodeBuild
         id: codebuild
-        #if: needs.codebuild-check.outputs.project_exist
+        if: needs.codebuild-check.outputs.project_exist
         uses: dark-mechanicum/aws-codebuild@v1
         env:
           CODEBUILD__sourceVersion: ${{ env.CODEBUILD_SOURCE }}
