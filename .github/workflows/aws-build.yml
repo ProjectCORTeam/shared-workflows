@@ -254,7 +254,7 @@ jobs:
 
       - name: Run AWS CodeBuild
         id: codebuild
-        if: needs.codebuild-check.outputs.project_exist
+        #if: needs.codebuild-check.outputs.project_exist
         uses: dark-mechanicum/aws-codebuild@v1
         env:
           CODEBUILD__sourceVersion: ${{ env.CODEBUILD_SOURCE }}
