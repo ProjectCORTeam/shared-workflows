@@ -52,7 +52,11 @@ jobs:
       runs-on: ${{ inputs.runner }}
       steps:
         - name: Checkout
-          uses: actions/checkout@v3
+          uses: actions/checkout@v4
+          with:
+            sparse-checkout: |
+              .infra
+            fetch-depth: 0
 
         - name: Input preprocessing
           shell: bash
@@ -78,7 +82,7 @@ jobs:
             echo "release_version: "${{inputs.release_version}}
 
         - name: Configure AWS Credentials - Terraform
-          uses: aws-actions/configure-aws-credentials@v2
+          uses: aws-actions/configure-aws-credentials@v4
           with:
             aws-access-key-id: ${{ secrets.TF_AWS_ACCESS_KEY_ID }}
             aws-secret-access-key: ${{ secrets.TF_AWS_SECRET_ACCESS_KEY }}
