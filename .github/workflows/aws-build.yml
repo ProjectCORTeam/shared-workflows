@@ -140,7 +140,7 @@ jobs:
   codebuild-check:
     runs-on: ${{ inputs.runner }}
     name: Codebuild Project Checks
-    needs: [sets-variables]
+    needs: sets-variables
     outputs:
       new_stage: ${{ steps.check-project.new_stage }}
       project_exist: ${{ steps.check-project.project_exist }}
