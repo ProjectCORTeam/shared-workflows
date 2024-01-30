@@ -84,6 +84,9 @@ jobs:
         continue-on-error: true
         id: version-tag
         run: |
+          echo "RELEASE_TAG=null"
+          echo "RELEASE_TAG=null" >> $GITHUB_ENV
+          echo "RELEASE_TAG=null" >> $GITHUB_OUTPUT
           tag=$(git describe --exact-match --tags HEAD)
           if [[ -n "$tag" ]]; then
               echo "Current commit has a tag: $tag"
@@ -92,9 +95,6 @@ jobs:
               echo "RELEASE_TAG=$tag" >> $GITHUB_OUTPUT
           else
               echo "Current commit does not have a tag"
-              echo "RELEASE_TAG=null"
-              echo "RELEASE_TAG=null" >> $GITHUB_ENV
-              echo "RELEASE_TAG=null" >> $GITHUB_OUTPUT
           fi
 
       - name: Get stage
@@ -228,7 +228,6 @@ jobs:
             echo "Release version is already builded"
             echo "ECR_IMAGE_EXIST=true" >> $GITHUB_ENV;
           fi
-
           echo "ECR_IMAGE_EXIST= "${{env.ECR_IMAGE_EXIST}}
 
       - name: Configure AWS Credentials - CICD
@@ -238,12 +237,26 @@ jobs:
           aws-secret-access-key: ${{ secrets.CICD_AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.CICD_AWS_REGION }}
 
+      - name: Select Codebuild Source
+        id: select-source
+        shell: bash
+        run: |
+          if [[ ${{needs.sets-variables.outputs.RELEASE_TAG}} != "null" ]]; then \
+            CODEBUILD_SOURCE=${{needs.sets-variables.outputs.RELEASE_TAG}}
+          else
+            CODEBUILD_SOURCE=$GITHUB_REF_NAME
+          fi
+          echo "CODEBUILD_SOURCE=$CODEBUILD_SOURCE"
+          echo "CODEBUILD_SOURCE=$CODEBUILD_SOURCE" >> $GITHUB_ENV 
+          echo "CODEBUILD_SOURCE=$CODEBUILD_SOURCE" >> $GITHUB_OUTPUT
+          
+
       - name: Run AWS CodeBuild
         id: codebuild
-        if: contains(fromJson('["true"]'), steps.check-project.outputs.project_exist)
+        if: false #contains(fromJson('["true"]'), needs.codebuild-check.outputs.project_exist)
         uses: dark-mechanicum/aws-codebuild@v1
         env:
-          CODEBUILD__sourceVersion: ${{ env.BRANCH_NAME }}
+          CODEBUILD__sourceVersion: ${{ env.CODEBUILD_SOURCE }}
           CODEBUILD__logsConfigOverride__cloudWatchLogs__status: 'ENABLED'
         with:
           projectName: ${{ env.CODEBUILD_PROJECT }}
