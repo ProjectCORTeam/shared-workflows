@@ -143,7 +143,7 @@ jobs:
     outputs:
       new_stage: ${{ steps.check-project.outputs.new_stage }}
       project_exist: ${{ steps.check-project.outputs.project_exist }}
-      codebuild_project: ${{ steps.check-project.outputs.codebuild_project }}
+      codebuild_project: ${{ github.env.CODEBUILD_PROJECT }}
       
     steps:
       - name: Configure AWS Credentials - CICD
@@ -176,6 +176,9 @@ jobs:
           echo "CODEBUILD_PROJECT=$CODEBUILD" >> $GITHUB_OUTPUT
           echo "CODEBUILD_PROJECT=$CODEBUILD" >> $GITHUB_ENV
 
+      - name: Set codebuild_project environment variable
+        run: |
+          echo "::set-env name=CODEBUILD_PROJECT::${{ github.env.CODEBUILD_PROJECT }}"
   aws-build:
     runs-on: ${{ inputs.runner }}
     name: AWS CodeBuild Trigger and Helm Push
