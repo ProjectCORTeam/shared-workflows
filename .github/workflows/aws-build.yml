@@ -127,13 +127,8 @@ jobs:
           SERVICE_NAME=$(cat .infra/infra-config.json | jq .name | tr -d '"')
           echo "SERVICE_NAME=$SERVICE_NAME" >> $GITHUB_ENV
           echo "SERVICE_NAME=$SERVICE_NAME" >> $GITHUB_OUTPUT
-          if [[ ${{startsWith(inputs.environment, 'staging')}} ]]; then
-            echo "PROJECT=$(echo $SERVICE_NAME-all)" >> $GITHUB_ENV
-            echo "PROJECT=$(echo $SERVICE_NAME-all)" >> $GITHUB_OUTPUT
-          else
           echo "PROJECT=$(echo $SERVICE_NAME-${{ inputs.environment }})" >> $GITHUB_ENV
           echo "PROJECT=$(echo $SERVICE_NAME-${{ inputs.environment }})" >> $GITHUB_OUTPUT
-          fi
 
   codebuild-check:
     runs-on: ${{ inputs.runner }}
