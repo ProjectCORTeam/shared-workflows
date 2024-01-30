@@ -228,7 +228,7 @@ jobs:
             echo "Release version is already builded"
             echo "ECR_IMAGE_EXIST=true" >> $GITHUB_ENV;
           fi
-          echo "ECR_IMAGE_EXIST= "${{env.ECR_IMAGE_EXIST}}
+          echo "ECR_IMAGE_EXIST= $ECR_IMAGE_EXIST"
 
       - name: Configure AWS Credentials - CICD
         uses: aws-actions/configure-aws-credentials@v4
@@ -253,7 +253,7 @@ jobs:
 
       - name: Run AWS CodeBuild
         id: codebuild
-        if: false #contains(fromJson('["true"]'), needs.codebuild-check.outputs.project_exist)
+        if: contains(fromJson('["true"]'), needs.codebuild-check.outputs.project_exist)
         uses: dark-mechanicum/aws-codebuild@v1
         env:
           CODEBUILD__sourceVersion: ${{ env.CODEBUILD_SOURCE }}
