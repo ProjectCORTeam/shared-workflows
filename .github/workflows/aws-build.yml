@@ -257,7 +257,8 @@ jobs:
         shell: bash
         run: |
           CODEBUILD=$(aws codebuild list-projects --region ${{ secrets.CICD_AWS_REGION }} --query 'projects[?ends_with(@,`${{ needs.sets-variables.outputs.PROJECT }}`) == `true`]' | jq ".[0]" | tr -d '"')
-          echo "CODEBUILD_PROJECT=$CODEBUILD" >> $GITHUB_ENV
+          echo "CODEBUILD_PROJECT_FINAL=$CODEBUILD" 
+          echo "CODEBUILD_PROJECT_FINAL=$CODEBUILD" >> $GITHUB_ENV
 
       - name: Run AWS CodeBuild
         id: codebuild
@@ -267,7 +268,7 @@ jobs:
           CODEBUILD__sourceVersion: ${{ github.env.CODEBUILD_SOURCE }}
           CODEBUILD__logsConfigOverride__cloudWatchLogs__status: 'ENABLED'
         with:
-          projectName: ${{ github.env.CODEBUILD_PROJECT }}
+          projectName: ${{ github.env.CODEBUILD_PROJECT_FINAL }}
           buildspec: '{
               "environmentVariablesOverride":[
                 {"name":"RELEASE_VERSION","value":"${{ env.RELEASE_VERSION }}","type": "PLAINTEXT"}
