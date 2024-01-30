@@ -223,12 +223,13 @@ jobs:
           echo "ECR check outcome: "${{steps.check-ecr-tag.outcome}}
           if [ '${{steps.check-ecr-tag.outcome}}' == 'failure' ]; then
             echo "Release version is not builded"
-            echo "ECR_IMAGE_EXIST=false" >> $GITHUB_ENV;
+            ECR_IMAGE_EXIST=false
           elif [ '${{steps.check-ecr-tag.outcome}}' == 'success' ]; then
             echo "Release version is already builded"
-            echo "ECR_IMAGE_EXIST=true" >> $GITHUB_ENV;
+            ECR_IMAGE_EXIST=true
           fi
-          echo "ECR_IMAGE_EXIST= $ECR_IMAGE_EXIST"
+          echo "ECR_IMAGE_EXIST=$ECR_IMAGE_EXIST" >> $GITHUB_ENV;
+          echo "ECR_IMAGE_EXIST=$ECR_IMAGE_EXIST"
 
       - name: Configure AWS Credentials - CICD
         uses: aws-actions/configure-aws-credentials@v4
