@@ -83,7 +83,6 @@ jobs:
             export TF_VAR_terraform_role_name="${{secrets.TF_VAR_TERRAFORM_ROLE_NAME}}"
             export TF_VAR_github_token="${{secrets.TF_VAR_GITHUB_TOKEN}}"
 
-
         - name: Generate terraform.auto.tfvars for environment
           id: tfvars_generator
           shell: bash
@@ -119,7 +118,7 @@ jobs:
           working-directory: .infra/terraform
 
         - name: Terraform Apply Staging
-          if: contains( inputs.stage, 'production')
+          if: !contains(fromJSON('["production", "beta"]'), inputs.stage)
           id: infra-apply-staging
           run: |
             terraform apply -auto-approve -input=false \
@@ -131,7 +130,7 @@ jobs:
           working-directory: .infra/terraform
 
         - name: Google Chat Notification - Staging
-          if: github.event_name == 'workflow_dispatch'
+          if: !contains(fromJSON('["production", "beta"]'), inputs.stage)
           uses: nakamuraos/google-chat-notifications@v2.1.0
           with:
             title: Infrastructure Apply
