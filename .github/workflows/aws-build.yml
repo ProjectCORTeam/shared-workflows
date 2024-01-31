@@ -258,7 +258,7 @@ jobs:
 
       - name: Run AWS CodeBuild
         id: codebuild
-        if: needs.codebuild-check.outputs.project_exist && !${{env.ECR_IMAGE_EXIST}}
+        if: needs.codebuild-check.outputs.project_exist && !env.ECR_IMAGE_EXIST
         uses: dark-mechanicum/aws-codebuild@v1
         env:
           CODEBUILD__sourceVersion: ${{ env.CODEBUILD_SOURCE }}
