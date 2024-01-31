@@ -181,10 +181,10 @@ jobs:
     name: AWS CodeBuild Trigger and Helm Push
     needs: [sets-variables, codebuild-check]
     outputs:
-      release_version: ${{ env.RELEASE_VERSION }}
+      release_version: ${{ github.env.RELEASE_VERSION }}
     steps:
 
-      - name: Set release version
+      - name: Set release version - Staging
         id: set-release-staging
         if: startsWith(inputs.stage, 'staging')
         run: |
@@ -192,14 +192,16 @@ jobs:
           RELEASE_VERSION=$(echo $RELEASE_VERSION | sed s/staging/v/g)
           RELEASE_VERSION=$RELEASE_VERSION".0.0-staging-"${{ needs.sets-variables.outputs.SHORT_COMMIT_HASH}}
           echo "RELEASE_VERSION=$RELEASE_VERSION" >> $GITHUB_ENV
+          echo "RELEASE_VERSION=$RELEASE_VERSION" >> $GITHUB_OUTPUT
           echo "Final staging release version: "$RELEASE_VERSION
 
-      - name: Set release version
+      - name: Set release version - Production
         id: set-release-prod
         if: contains(fromJson('["production", "beta"]'), inputs.stage)
         run: |
           echo "RELEASE_VERSION=${{ needs.sets-variables.outputs.RELEASE_TAG }}" >> $GITHUB_ENV
-          echo "Final production release version: "$RELEASE_VERSION
+          echo "RELEASE_VERSION=${{ needs.sets-variables.outputs.RELEASE_TAG }}" >> $GITHUB_OUTPUT
+          echo "Final production release version: ${{ github.env.RELEASE_VERSION }}"
 
       - name: Configure AWS Credentials - Shared
         uses: aws-actions/configure-aws-credentials@v4
@@ -216,7 +218,7 @@ jobs:
           echo "ECR Repository: "$ECR_REPOSITORY
 
           if [[ ${{startsWith(inputs.stage, 'staging')}} ]]; then
-            aws ecr describe-images --repository-name $ECR_REPOSITORY --region ${{ secrets.SHARED_AWS_REGION }} --image-ids imageTag=${{ env.RELEASE_VERSION}}
+            aws ecr describe-images --repository-name $ECR_REPOSITORY --region ${{ secrets.SHARED_AWS_REGION }} --image-ids imageTag=${{ github.env.RELEASE_VERSION}}
           else
             aws ecr describe-images --repository-name $ECR_REPOSITORY --region ${{ secrets.SHARED_AWS_REGION }} --image-ids imageTag=${{ needs.sets-variables.outputs.RELEASE_TAG}}
           fi
@@ -265,13 +267,13 @@ jobs:
 
       - name: Run AWS CodeBuild
         id: codebuild
-        if: needs.codebuild-check.outputs.project_exist && !env.ECR_IMAGE_EXIST
+        if: needs.codebuild-check.outputs.project_exist && ${{ github.env.ECR_IMAGE_EXIST == false }}
         uses: dark-mechanicum/aws-codebuild@v1
         env:
-          CODEBUILD__sourceVersion: ${{ env.CODEBUILD_SOURCE }}
+          CODEBUILD__sourceVersion: ${{ github.env.CODEBUILD_SOURCE }}
           CODEBUILD__logsConfigOverride__cloudWatchLogs__status: 'ENABLED'
         with:
-          projectName: ${{ env.CODEBUILD_PROJECT_FINAL }}
+          projectName: ${{ github.env.CODEBUILD_PROJECT_FINAL }}
           buildspec: '{
               "environmentVariablesOverride":[
                 {"name":"RELEASE_VERSION","value":"${{ env.RELEASE_VERSION }}","type": "PLAINTEXT"}
@@ -283,7 +285,7 @@ jobs:
   #       uses: nakamuraos/google-chat-notifications@v2.1.0
   #       with:
   #         title: Image Build
-  #         subtitle: ${{ env.RELEASE_VERSION }}
+  #         subtitle: ${{ github.env.RELEASE_VERSION }}
   #         webhookUrl: ${{ secrets.GOOGLE_WEBHOOK }}
   #         status: ${{ steps.codebuild.outcome }}
 
@@ -292,6 +294,6 @@ jobs:
   #       uses: nakamuraos/google-chat-notifications@v2.1.0
   #       with:
   #         title: Image Build
-  #         subtitle: ${{ env.RELEASE_VERSION }}
+  #         subtitle: ${{ github.env.RELEASE_VERSION }}
   #         webhookUrl: ${{ secrets.GOOGLE_WEBHOOK }}
   #         status: 'success'
