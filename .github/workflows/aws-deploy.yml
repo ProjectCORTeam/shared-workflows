@@ -58,17 +58,6 @@ jobs:
               .infra
             fetch-depth: 0
 
-        - name: Input preprocessing
-          shell: bash
-          working-directory: .infra/terraform
-          run: |
-            if [[ ${{inputs.stage}} == "master" ]]; \
-            then \
-            echo "STAGE=production" >> $GITHUB_ENV; \
-            else \
-            echo "STAGE=${{inputs.stage}}" >> $GITHUB_ENV ; \
-            fi
-
         - name: Input checks
           shell: bash
           working-directory: .infra/terraform
@@ -78,7 +67,7 @@ jobs:
             echo "runner: "${{ inputs.runner }}
             echo "env_check: "${{inputs.env_check}}
             echo "new_stage: "${{ inputs.new_stage }}
-            echo "stage: "${{env.STAGE}}
+            echo "stage: "${{inputs.stage}}
             echo "release_version: "${{inputs.release_version}}
 
         - name: Configure AWS Credentials - Terraform
@@ -101,10 +90,10 @@ jobs:
           shell: bash
           working-directory: .infra
           run: |
-            if [ ${{env.STAGE}} == 'production' ] || [ ${{env.STAGE}} == 'beta' ]; then \
-              jq --argjson new_env '{"new_env": ${{ inputs.new_stage }}}' --arg commit_id "$(git rev-parse --short HEAD)" --arg version ${{inputs.release_version}} '.commit_id += $commit_id | (.env_settings[]) += {new_env: false} | .env_settings |= map(if .stage == "${{env.STAGE}}" then . += $new_env + {release_version: $version} else . end)' infra-config.json > ./terraform/terraform.auto.tfvars.json              
+            if [ ${{inputs.stage}} == 'production' ] || [ ${{inputs.stage}} == 'beta' ]; then \
+              jq --argjson new_env '{"new_env": ${{ inputs.new_stage }}}' --arg commit_id "$(git rev-parse --short HEAD)" --arg version ${{inputs.release_version}} '.commit_id += $commit_id | (.env_settings[]) += {new_env: false} | .env_settings |= map(if .stage == "${{inputs.stage}}" then . += $new_env + {release_version: $version} else . end)' infra-config.json > ./terraform/terraform.auto.tfvars.json              
             else \
-              jq --argjson new_env '{"new_env": ${{ inputs.new_stage }}}' --arg commit_id "$(git rev-parse --short HEAD)" '.commit_id += $commit_id | (.env_settings[]) += {new_env: false} | .env_settings |= map(if .stage == "${{env.STAGE}}" then . += $new_env else . end)' infra-config.json > ./terraform/terraform.auto.tfvars.json
+              jq --argjson new_env '{"new_env": ${{ inputs.new_stage }}}' --arg commit_id "$(git rev-parse --short HEAD)" '.commit_id += $commit_id | (.env_settings[]) += {new_env: false} | .env_settings |= map(if .stage == "${{inputs.stage}}" then . += $new_env else . end)' infra-config.json > ./terraform/terraform.auto.tfvars.json
             fi
             terraform fmt
             cat ./terraform/terraform.auto.tfvars.json
@@ -136,7 +125,7 @@ jobs:
           run: |
             terraform apply -auto-approve -input=false \
             -target='module.shared' \
-            -target='module.staging["${{ env.STAGE }}"]' \
+            -target='module.staging["${{ inputs.stage }}"]' \
             -var="account_id_list=${{secrets.TF_VAR_ACCOUNT_ID_LIST}}" \
             -var="terraform_role_name=${{secrets.TF_VAR_TERRAFORM_ROLE_NAME}}" \
             -var="github_token=${{secrets.TF_VAR_GITHUB_TOKEN}}"
@@ -147,7 +136,7 @@ jobs:
           uses: nakamuraos/google-chat-notifications@v2.1.0
           with:
             title: Infrastructure Apply
-            subtitle: Staging - ${{ env.STAGE }}
+            subtitle: Staging - ${{ inputs.stage }}
             webhookUrl: ${{ secrets.GOOGLE_WEBHOOK }}
             status: ${{ steps.infra-apply-staging.outcome }}
 
@@ -186,7 +175,7 @@ jobs:
           run: exit 1
 
         - name: Terraform Apply Beta
-          if: github.event_name == 'release' && env.STAGE == 'beta'
+          if: github.event_name == 'release' && inputs.stage == 'beta'
           id: infra-apply-beta
           run: |
             terraform apply -auto-approve -input=false \
@@ -198,7 +187,7 @@ jobs:
           working-directory: .infra/terraform
 
         - name: Terraform Apply Prod
-          if: github.event_name == 'release' && env.STAGE == 'production'
+          if: github.event_name == 'release' && inputs.stage == 'production'
           id: infra-apply-production
           run: |
             terraform apply -auto-approve -input=false \
@@ -210,19 +199,19 @@ jobs:
           working-directory: .infra/terraform
 
         - name: Google Chat Notification - Beta
-          if: github.event_name == 'release' && env.STAGE == 'beta'
+          if: github.event_name == 'release' && inputs.stage == 'beta'
           uses: nakamuraos/google-chat-notifications@v2.1.0
           with:
             title: Infrastructure Apply
-            subtitle: ${{ env.STAGE }}
+            subtitle: ${{ inputs.stage }}
             webhookUrl: ${{ secrets.GOOGLE_WEBHOOK }}
             status: ${{ steps.infra-apply-beta.outcome }}
 
         - name: Google Chat Notification - Production
-          if: github.event_name == 'release' && env.STAGE == 'production'
+          if: github.event_name == 'release' && inputs.stage == 'production'
           uses: nakamuraos/google-chat-notifications@v2.1.0
           with:
             title: Infrastructure Apply
-            subtitle: ${{ env.STAGE }}
+            subtitle: ${{ inputs.stage }}
             webhookUrl: ${{ secrets.GOOGLE_WEBHOOK }}
             status: ${{ steps.infra-apply-production.outcome }}
