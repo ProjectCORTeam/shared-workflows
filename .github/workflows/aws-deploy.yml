@@ -11,7 +11,7 @@ on:
         type: string
         default: 'ubuntu-latest'
       env_check:
-        required: true
+        required: false
         type: string
         description: "Environment status checker"
       new_stage:
@@ -65,7 +65,6 @@ jobs:
             echo "github_event: "${{github.event_name }}
             echo "github_branch: "${{github.ref}}
             echo "runner: "${{ inputs.runner }}
-            echo "env_check: "${{inputs.env_check}}
             echo "new_stage: "${{ inputs.new_stage }}
             echo "stage: "${{inputs.stage}}
             echo "release_version: "${{inputs.release_version}}
