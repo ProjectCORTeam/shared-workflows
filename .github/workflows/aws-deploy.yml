@@ -32,6 +32,11 @@ on:
         type: boolean
         default: true
         description: "Enable notifications to cloud or team owner flag"
+      only_plan:
+          required: false
+          type: boolean
+          default: false
+          description: "Enable notifications to cloud or team owner flag"
     secrets: 
       CICD_AWS_ACCESS_KEY_ID:
         required: true
@@ -139,7 +144,7 @@ jobs:
             status: ${{ steps.infra-apply-staging.outcome }}
 
         - name: Terraform Plan Beta
-          if: contains( inputs.stage, 'beta' )
+          if: contains( inputs.stage, 'beta' ) && inputs.only_plan
           id: plan-beta
           run: |
             terraform plan -no-color -input=false \
@@ -152,7 +157,7 @@ jobs:
           working-directory: .infra/terraform
         
         - name: Terraform Plan Prod
-          if: contains( inputs.stage, 'production' )
+          if: contains( inputs.stage, 'production' ) && inputs.only_plan
           id: plan-prod
           run: |
             terraform plan -no-color -input=false \
@@ -173,7 +178,7 @@ jobs:
           run: exit 1
 
         - name: Terraform Apply Beta
-          if: inputs.stage == 'beta'
+          if: inputs.stage == 'beta' && !inputs.only_plan
           id: infra-apply-beta
           run: |
             terraform apply -auto-approve -input=false \
@@ -185,7 +190,7 @@ jobs:
           working-directory: .infra/terraform
 
         - name: Terraform Apply Prod
-          if: inputs.stage == 'production'
+          if: inputs.stage == 'production' && !inputs.only_plan
           id: infra-apply-production
           run: |
             terraform apply -auto-approve -input=false \
