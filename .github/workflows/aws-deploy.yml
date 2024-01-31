@@ -140,7 +140,7 @@ jobs:
             status: ${{ steps.infra-apply-staging.outcome }}
 
         - name: Terraform Plan Beta
-          if: github.event_name == 'pull_request' && contains( github.base_ref, 'beta' )
+          if: github.event_name == 'pull_request' && contains( inputs.stage, 'beta' )
           id: plan-beta
           run: |
             terraform plan -no-color -input=false \
@@ -153,7 +153,7 @@ jobs:
           working-directory: .infra/terraform
         
         - name: Terraform Plan Prod
-          if: github.event_name == 'pull_request' && contains( github.base_ref, 'master' )
+          if: github.event_name == 'pull_request' && contains( inputs.stage, 'master' )
           id: plan-prod
           run: |
             terraform plan -no-color -input=false \

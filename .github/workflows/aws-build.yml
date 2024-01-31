@@ -30,7 +30,7 @@ on:
         value: ${{ jobs.codebuild-check.outputs.project_exist }}
       stage:
         description: "Stage name for infrastructure deployment"
-        value: ${{ jobs.sets-variables.outputs.stage }}
+        value: ${{ jobs.sets-variables.outputs.STAGE }}
       release_version:
         description: "Semantic versioning for production environment"
         value: ${{ jobs.aws-build.outputs.release_version }}
