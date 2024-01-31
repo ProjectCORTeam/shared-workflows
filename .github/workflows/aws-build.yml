@@ -184,15 +184,19 @@ jobs:
       release_version: ${{ env.RELEASE_VERSION }}
     steps:
 
-      - name: Set staging release version
-        id: set-release-staging
-        if: startsWith(inputs.stage, 'staging')
+      - name: Set release version
+        id: set-release
         run: |
-          RELEASE_VERSION=${{ inputs.stage }}
-          RELEASE_VERSION=$(echo $RELEASE_VERSION | sed s/staging/v/g)
-          RELEASE_VERSION=$RELEASE_VERSION".0.0-staging-"${{ needs.sets-variables.outputs.SHORT_COMMIT_HASH}}
-          echo "Final staging release version: "$RELEASE_VERSION
-          echo "RELEASE_VERSION=$RELEASE_VERSION" >> $GITHUB_ENV
+          if [[ ${{startsWith(inputs.stage, 'staging')}} ]]; then
+            RELEASE_VERSION=${{ inputs.stage }}
+            RELEASE_VERSION=$(echo $RELEASE_VERSION | sed s/staging/v/g)
+            RELEASE_VERSION=$RELEASE_VERSION".0.0-staging-"${{ needs.sets-variables.outputs.SHORT_COMMIT_HASH}}
+            echo "Final staging release version: "$RELEASE_VERSION
+          else
+            RELEASE_VERSION = ${{ needs.sets-variables.outputs.RELEASE_TAG }}
+          fi
+          echo "RELEASE_VERSION=$RELEASE_VERSION" >> $GITHUB_ENV          
+
 
       - name: Configure AWS Credentials - Shared
         uses: aws-actions/configure-aws-credentials@v4
@@ -288,13 +292,3 @@ jobs:
   #         subtitle: ${{ env.RELEASE_VERSION }}
   #         webhookUrl: ${{ secrets.GOOGLE_WEBHOOK }}
   #         status: 'success'
-
-  #     - name: Output checks
-  #       shell: bash
-  #       working-directory: .infra/terraform
-  #       run: |
-  #         echo "new_stage: " ${{ steps.check-project.outputs.new_stage }}
-  #         echo "stage_check: " ${{ steps.check-project.outputs.project_exist }}
-  #         echo "stage: " ${{ steps.set_project_name.outputs.stage }}
-  #         echo "env_check: " ${{ steps.set_project_name.outcome }}
-  #         echo "release_version: " ${{ env.RELEASE_VERSION}}
