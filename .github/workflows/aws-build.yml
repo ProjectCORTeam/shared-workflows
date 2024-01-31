@@ -267,10 +267,10 @@ jobs:
 
       - name: Run AWS CodeBuild
         id: codebuild
-        if: needs.codebuild-check.outputs.project_exist && ${{ github.env.ECR_IMAGE_EXIST == false }}
+        if: needs.codebuild-check.outputs.project_exist && ${{ env.ECR_IMAGE_EXIST == false }}
         uses: dark-mechanicum/aws-codebuild@v1
         env:
-          CODEBUILD__sourceVersion: ${{ github.env.CODEBUILD_SOURCE }}
+          CODEBUILD__sourceVersion: ${{ env.CODEBUILD_SOURCE }}
           CODEBUILD__logsConfigOverride__cloudWatchLogs__status: 'ENABLED'
         with:
           projectName: ${{ env.CODEBUILD_PROJECT_FINAL }}
