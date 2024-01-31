@@ -21,16 +21,16 @@ on:
     outputs:
       new_stage:
         description: "New stage deployment check flag"
-        value: ${{ jobs.aws-build.outputs.new_stage }}
+        value: ${{ jobs.codebuild-check.outputs.new_stage }}
       env_check:
         description: "Environment status checker"
         value: ${{ jobs.aws-build.outputs.env_check }}
       stage_check:
         description: "Stage status checker"
-        value: ${{ jobs.aws-build.outputs.stage_check }}
+        value: ${{ jobs.codebuild-check.outputs.project_exist }}
       stage:
         description: "Stage name for infrastructure deployment"
-        value: ${{ jobs.aws-build.outputs.stage }}
+        value: ${{ jobs.sets-variables.outputs.stage }}
       release_version:
         description: "Semantic versioning for production environment"
         value: ${{ jobs.aws-build.outputs.release_version }}
@@ -181,10 +181,6 @@ jobs:
     name: AWS CodeBuild Trigger and Helm Push
     needs: [sets-variables, codebuild-check]
     outputs:
-      new_stage: ${{ steps.check-project.outputs.new_stage }}
-      stage_check: ${{ steps.check-project.outputs.project_exist }}
-      stage: ${{ steps.set_project_name.outputs.stage }}
-      env_check: ${{ steps.set_project_name.outcome }}
       release_version: ${{ env.RELEASE_VERSION }}
     steps:
 
