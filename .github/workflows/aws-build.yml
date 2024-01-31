@@ -185,19 +185,21 @@ jobs:
     steps:
 
       - name: Set release version
-        id: set-release
+        id: set-release-staging
+        if: startsWith(inputs.stage, 'staging')
         run: |
-          if [[ ${{startsWith(inputs.stage, 'staging')}} ]]; then
-            RELEASE_VERSION=${{ inputs.stage }}
-            RELEASE_VERSION=$(echo $RELEASE_VERSION | sed s/staging/v/g)
-            RELEASE_VERSION=$RELEASE_VERSION".0.0-staging-"${{ needs.sets-variables.outputs.SHORT_COMMIT_HASH}}
-            echo "RELEASE_VERSION=$RELEASE_VERSION" >> $GITHUB_
-            echo "Final staging release version: "$RELEASE_VERSION
-          else
-            echo "RELEASE_VERSION=${{ needs.sets-variables.outputs.RELEASE_TAG }}" >> $GITHUB_ENV
-            echo "Final production release version: "$RELEASE_VERSION
-          fi
+          RELEASE_VERSION=${{ inputs.stage }}
+          RELEASE_VERSION=$(echo $RELEASE_VERSION | sed s/staging/v/g)
+          RELEASE_VERSION=$RELEASE_VERSION".0.0-staging-"${{ needs.sets-variables.outputs.SHORT_COMMIT_HASH}}
+          echo "RELEASE_VERSION=$RELEASE_VERSION" >> $GITHUB_ENV
+          echo "Final staging release version: "$RELEASE_VERSION
 
+      - name: Set release version
+        id: set-release-prod
+        if: contains(fromJson('["production", "beta"]'), inputs.stage)
+        run: |
+          echo "RELEASE_VERSION=${{ needs.sets-variables.outputs.RELEASE_TAG }}" >> $GITHUB_ENV
+          echo "Final production release version: "$RELEASE_VERSION
 
       - name: Configure AWS Credentials - Shared
         uses: aws-actions/configure-aws-credentials@v4
