@@ -273,7 +273,7 @@ jobs:
           CODEBUILD__sourceVersion: ${{ github.env.CODEBUILD_SOURCE }}
           CODEBUILD__logsConfigOverride__cloudWatchLogs__status: 'ENABLED'
         with:
-          projectName: ${{ github.env.CODEBUILD_PROJECT_FINAL }}
+          projectName: ${{ env.CODEBUILD_PROJECT_FINAL }}
           buildspec: '{
               "environmentVariablesOverride":[
                 {"name":"RELEASE_VERSION","value":"${{ env.RELEASE_VERSION }}","type": "PLAINTEXT"}
