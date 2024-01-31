@@ -97,7 +97,7 @@ jobs:
             cat ./terraform/terraform.auto.tfvars.json
 
         - name: Setup Terraform
-          uses: hashicorp/setup-terraform@v2
+          uses: hashicorp/setup-terraform@v3
           with:
             terraform_version: 1.5.3
             cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
@@ -123,7 +123,7 @@ jobs:
           run: |
             terraform apply -auto-approve -input=false \
             -target='module.shared' \
-            -target='module.staging["${{ inputs.stage }}"]' \
+            -target='module.staging["staging${{ inputs.stage }}"]' \
             -var="account_id_list=${{secrets.TF_VAR_ACCOUNT_ID_LIST}}" \
             -var="terraform_role_name=${{secrets.TF_VAR_TERRAFORM_ROLE_NAME}}" \
             -var="github_token=${{secrets.TF_VAR_GITHUB_TOKEN}}"
