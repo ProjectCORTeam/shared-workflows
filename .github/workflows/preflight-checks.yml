@@ -23,7 +23,7 @@ jobs:
         run: |
           # Obtener información del usuario
           membership_url="https://api.github.com/orgs/${{inputs.organization}}/teams/${{inputs.team}}/memberships/${{github.actor}}"
-          membership_response=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "$membership_url")
+          membership_response=$(curl -s -H "Authorization: Bearer ${{ github.GITHUB_TOKEN }}" "$membership_url")
           echo $membership_response | jq 
 
           state=$(echo "$response" | jq -r '.state')
