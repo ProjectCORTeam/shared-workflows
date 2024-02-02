@@ -13,7 +13,7 @@ on:
         required: true
         type: string
     secrets:
-      PREFLIGHT-CHECKS-TOKEN:
+      PREFLIGHT_CHEKS_TOKEN:
         required: true
 
 jobs:
