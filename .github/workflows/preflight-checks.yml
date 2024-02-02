@@ -12,7 +12,7 @@ jobs:
         id: check_group
         run: |
           username="${{ github.actor }}"
-          group="prod_deployers"
+          group="@ProjectCORTeam/prod-deployers"
 
           # Obtener información del usuario
           user_url="https://api.github.com/users/$username"
