@@ -23,6 +23,10 @@ jobs:
           groups_response=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "$user_groups_url")
           groups=$(echo "$groups_response" | jq -r '.[].login')
 
+          # Imprimir los grupos del usuario
+          echo "Grupos del usuario $username:"
+          echo "$groups"
+
           # Verificar si el usuario pertenece al grupo especificado
           if echo "$groups" | grep -q "$group"; then
             echo "El usuario $username pertenece al grupo $group"
