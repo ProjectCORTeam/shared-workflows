@@ -32,7 +32,7 @@ jobs:
           state=$(echo "$response" | jq -r '.state')
           echo $state
           
-          if [[ "$state" == '"active"'' ]]; then
+          if [[ "$state" == '"active"' ]]; then
             echo "User have permission to execute this workflow for ${{ inputs.stage }} stage"
           else
             echo "You don't have permission to execute this workflow for ${{ inputs.stage }} stage"
