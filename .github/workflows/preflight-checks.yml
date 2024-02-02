@@ -33,3 +33,4 @@ jobs:
           else
             echo "You don't have permission to execute this workflow for ${{ inputs.stage }} stage"
             exit 1
+          fi
