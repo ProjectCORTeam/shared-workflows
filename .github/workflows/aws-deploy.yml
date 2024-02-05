@@ -65,8 +65,9 @@ jobs:
             EOL
     
         - name: Checkout
-          uses: actions/checkout@v3
+          uses: actions/checkout@v4
 
+        - uses: terraform-cache/terraform-cache@v1
 
         - name: Input preprocessing
           shell: bash
