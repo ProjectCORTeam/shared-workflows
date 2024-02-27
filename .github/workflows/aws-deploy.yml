@@ -81,12 +81,12 @@ jobs:
             aws-secret-access-key: ${{ secrets.TF_AWS_SECRET_ACCESS_KEY }}
             aws-region: ${{ secrets.TF_AWS_REGION }}
 
-        - name: Set Global Terraform Variables
-          shell: bash
-          run: |
-            export TF_VAR_account_id_list='${{secrets.TF_VAR_ACCOUNT_ID_LIST}}'
-            export TF_VAR_terraform_role_name="${{secrets.TF_VAR_TERRAFORM_ROLE_NAME}}"
-            export TF_VAR_github_token="${{secrets.TF_VAR_GITHUB_TOKEN}}"
+        # - name: Set Global Terraform Variables
+        #   shell: bash
+        #   run: |
+        #     export TF_VAR_account_id_list='${{secrets.TF_VAR_ACCOUNT_ID_LIST}}'
+        #     export TF_VAR_terraform_role_name="${{secrets.TF_VAR_TERRAFORM_ROLE_NAME}}"
+        #     export TF_VAR_github_token="${{secrets.TF_VAR_GITHUB_TOKEN}}"
 
         - name: Generate terraform.auto.tfvars for environment
           id: tfvars_generator
@@ -102,9 +102,9 @@ jobs:
             cat ./terraform/terraform.auto.tfvars.json
 
         - name: Setup Terraform
-          uses: hashicorp/setup-terraform@v3
+          uses: hashicorp/setup-terraform@v3.0.0
           with:
-            terraform_version: 1.5.3
+            #terraform_version: 1.5.3
             cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
         
         # - uses: terraform-cache/terraform-cache@v1
@@ -130,11 +130,7 @@ jobs:
           run: |
             terraform apply -auto-approve -input=false \
             -target='module.shared' \
-            -target='module.staging["staging${{ inputs.stage }}"]' \
-            -lock=false \
-            -var="account_id_list=${{secrets.TF_VAR_ACCOUNT_ID_LIST}}" \
-            -var="terraform_role_name=${{secrets.TF_VAR_TERRAFORM_ROLE_NAME}}" \
-            -var="github_token=${{secrets.TF_VAR_GITHUB_TOKEN}}"
+            -target='module.staging["staging${{ inputs.stage }}"]'
           working-directory: .infra/terraform
 
         - name: Google Chat Notification - Staging
@@ -152,10 +148,7 @@ jobs:
           run: |
             terraform plan -no-color -input=false \
             -target='module.shared' \
-            -target='module.prod["beta"]' \
-            -var="account_id_list=${{secrets.TF_VAR_ACCOUNT_ID_LIST}}" \
-            -var="terraform_role_name=${{secrets.TF_VAR_TERRAFORM_ROLE_NAME}}" \
-            -var="github_token=${{secrets.TF_VAR_GITHUB_TOKEN}}"
+            -target='module.prod["beta"]'
           continue-on-error: true
           working-directory: .infra/terraform
         
@@ -165,10 +158,7 @@ jobs:
           run: |
             terraform plan -no-color -input=false \
             -target='module.shared' \
-            -target='module.prod["production"]' \
-            -var="account_id_list=${{secrets.TF_VAR_ACCOUNT_ID_LIST}}" \
-            -var="terraform_role_name=${{secrets.TF_VAR_TERRAFORM_ROLE_NAME}}" \
-            -var="github_token=${{secrets.TF_VAR_GITHUB_TOKEN}}"
+            -target='module.prod["production"]'
           continue-on-error: true
           working-directory: .infra/terraform
 
@@ -186,10 +176,7 @@ jobs:
           run: |
             terraform apply -auto-approve -input=false \
             -target='module.shared' \
-            -target='module.prod["beta"]' \
-            -var="account_id_list=${{secrets.TF_VAR_ACCOUNT_ID_LIST}}" \
-            -var="terraform_role_name=${{secrets.TF_VAR_TERRAFORM_ROLE_NAME}}" \
-            -var="github_token=${{secrets.TF_VAR_GITHUB_TOKEN}}"          
+            -target='module.prod["beta"]'        
           working-directory: .infra/terraform
 
         - name: Terraform Apply Prod
@@ -198,10 +185,7 @@ jobs:
           run: |
             terraform apply -auto-approve -input=false \
             -target='module.shared' \
-            -target='module.prod["production"]' \
-            -var="account_id_list=${{secrets.TF_VAR_ACCOUNT_ID_LIST}}" \
-            -var="terraform_role_name=${{secrets.TF_VAR_TERRAFORM_ROLE_NAME}}" \
-            -var="github_token=${{secrets.TF_VAR_GITHUB_TOKEN}}"
+            -target='module.prod["production"]' 
           working-directory: .infra/terraform
 
         - name: Google Chat Notification - Beta
