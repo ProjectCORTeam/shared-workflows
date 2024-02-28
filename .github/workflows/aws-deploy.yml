@@ -54,7 +54,7 @@ jobs:
         - name: Install Terraform
           uses: little-core-labs/install-terraform@v2.0.0
           with:
-              version: 1.5.3
+              version: 1.7.4
         - name: Setup Terraform
           shell: bash
           run: |
@@ -123,23 +123,6 @@ jobs:
             terraform fmt
             cat ./terraform/terraform.auto.tfvars.json
 
-        # - name: Generate terraform.auto.tfvars for existing environment
-        #   if:  contains(fromJson('["false"]'), inputs.new_stage )
-        #   id: tfvars_generator_existing
-        #   shell: bash
-        #   working-directory: .infra
-        #   run: |
-        #     echo "Release version: "${{inputs.release_version}}
-        #     echo "Commit ID: $(git rev-parse --short HEAD)"
-            
-        #     if [ ${{env.STAGE}} == 'production' ] || [ ${{env.STAGE}} == 'beta' ]; then \
-        #       jq --argjson new_env '{"new_env": ${{ inputs.new_stage }}}' --arg commit_id "$(git rev-parse --short HEAD)" --arg version ${{inputs.release_version}} '.commit_id += $commit_id | (.env_settings[]) += {new_env: false} | .env_settings |= map(if .stage == "${{env.STAGE}}" then . += $new_env + {release_version: $version} else . end)' infra-config.json > ./terraform/terraform.auto.tfvars.json              
-        #     else \
-        #       jq --argjson new_env '{"new_env": ${{ inputs.new_stage }}}' --arg commit_id "$(git rev-parse --short HEAD)" '.commit_id += $commit_id | (.env_settings[]) += {new_env: false} | .env_settings |= map(if .stage == "${{env.STAGE}}" then . += $new_env else . end)' infra-config.json > ./terraform/terraform.auto.tfvars.json
-        #     fi
-        #     terraform fmt
-        #     cat ./terraform/terraform.auto.tfvars.json
-
         - name: Terraform Format
           id: fmt
           run: terraform fmt -check -recursive -diff
@@ -162,7 +145,6 @@ jobs:
             terraform apply -auto-approve -input=false \
             -target='module.shared' \
             -target='module.staging["${{ env.STAGE }}"]' \
-            -lock=false \
             -var="account_id_list=${{secrets.TF_VAR_ACCOUNT_ID_LIST}}" \
             -var="terraform_role_name=${{secrets.TF_VAR_TERRAFORM_ROLE_NAME}}" \
             -var="github_token=${{secrets.TF_VAR_GITHUB_TOKEN}}"
