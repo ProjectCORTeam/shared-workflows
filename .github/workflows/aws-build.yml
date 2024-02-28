@@ -223,6 +223,7 @@ jobs:
           fi
 
       - name: Check ECR image tag outcome
+        id: check-ecr
         run: |
           echo "ECR check outcome: "${{steps.check-ecr-tag.outcome}}
           if [ '${{steps.check-ecr-tag.outcome}}' == 'failure' ]; then
@@ -233,6 +234,7 @@ jobs:
             ECR_IMAGE_EXIST=true
           fi
           echo "ECR_IMAGE_EXIST=$ECR_IMAGE_EXIST" >> $GITHUB_ENV;
+          echo "ECR_IMAGE_EXIST=$ECR_IMAGE_EXIST" >> $GITHUB_OUTPUT;
           echo "ECR_IMAGE_EXIST=$ECR_IMAGE_EXIST"
 
       - name: Configure AWS Credentials - CICD
@@ -266,7 +268,7 @@ jobs:
 
       - name: Run AWS CodeBuild
         id: codebuild
-        if: ${{ needs.codebuild-check.outputs.project_exist == 'false' }}
+        if: ${{ steps.check-ecr.outputs.ECR_IMAGE_EXIST == false }}
         uses: dark-mechanicum/aws-codebuild@v1
         env:
           CODEBUILD__sourceVersion: ${{ env.CODEBUILD_SOURCE }}
