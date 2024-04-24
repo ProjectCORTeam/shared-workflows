@@ -218,7 +218,7 @@ jobs:
         run: |
           echo "RELEASE_VERSION=${{ needs.sets-variables.outputs.RELEASE_TAG }}" >> $GITHUB_ENV
           echo "RELEASE_VERSION=${{ needs.sets-variables.outputs.RELEASE_TAG }}" >> $GITHUB_OUTPUT
-          echo "Final production release version: ${{ env.RELEASE_VERSION }}"
+          echo "Final production release version: $RELEASE_VERSION }}"
 
       - name: Configure AWS Credentials - Shared
         uses: aws-actions/configure-aws-credentials@v4
@@ -286,7 +286,7 @@ jobs:
 
       - name: Run AWS CodeBuild
         id: codebuild
-        if: ${{ steps.check-ecr.outputs.ECR_IMAGE_EXIST == false }}
+        if: ${{ steps.check-ecr.outputs.ECR_IMAGE_EXIST == 'false' }}
         uses: dark-mechanicum/aws-codebuild@v1
         env:
           CODEBUILD__sourceVersion: ${{ env.CODEBUILD_SOURCE }}
