@@ -114,8 +114,8 @@ jobs:
             STAGE=${STAGE_INPUT/staging/}
             echo "ENVIRONMENT=staging" >> $GITHUB_ENV
             echo "ENVIRONMENT=staging" >> $GITHUB_OUTPUT
-            echo "STAGE=$STAGE" >> $GITHUB_ENV
-            echo "STAGE=$STAGE" >> $GITHUB_OUTPUT
+            echo "STAGE=$STAGE_INPUT$STAGE" >> $GITHUB_ENV
+            echo "STAGE=$STAGE_INPUT$STAGE" >> $GITHUB_OUTPUT
             echo "STAGE_SHORT=st$STAGE" >> $GITHUB_ENV
             echo "STAGE_SHORT=st$STAGE" >> $GITHUB_OUTPUT
             echo "Se está ejecutando como staging"
