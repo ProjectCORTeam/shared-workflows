@@ -115,6 +115,10 @@ jobs:
           echo "STAGE_SHORT=$STAGE_SHORT" >> $GITHUB_ENV
           echo "STAGE_SHORT=$STAGE_SHORT" >> $GITHUB_OUTPUT
 
+          echo "ENVIRONMENT=$ENVIRONMENT"
+          echo "STAGE=$STAGE"
+          echo "STAGE_SHORT=$STAGE_SHORT"
+
       - name: Extract branch name
         id: extract_branch
         shell: bash
@@ -131,9 +135,9 @@ jobs:
           echo "SERVICE_NAME=$SERVICE_NAME"
           echo "SERVICE_NAME=$SERVICE_NAME" >> $GITHUB_ENV
           echo "SERVICE_NAME=$SERVICE_NAME" >> $GITHUB_OUTPUT
-          echo "PROJECT=$(echo $SERVICE_NAME-${{ inputs.environment }})"
-          echo "PROJECT=$(echo $SERVICE_NAME-${{ inputs.environment }})" >> $GITHUB_ENV
-          echo "PROJECT=$(echo $SERVICE_NAME-${{ inputs.environment }})" >> $GITHUB_OUTPUT
+          echo "PROJECT=$(echo $SERVICE_NAME-${{ env.environment }})"
+          echo "PROJECT=$(echo $SERVICE_NAME-${{ env.environment }})" >> $GITHUB_ENV
+          echo "PROJECT=$(echo $SERVICE_NAME-${{ env.environment }})" >> $GITHUB_OUTPUT
 
   codebuild-check:
     runs-on: ${{ inputs.runner }}
