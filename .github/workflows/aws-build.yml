@@ -86,8 +86,8 @@ jobs:
           echo "SHORT_COMMIT_HASH=$short_commit_hash" >> $GITHUB_ENV
           echo "SHORT_COMMIT_HASH=$short_commit_hash" >> $GITHUB_OUTPUT
 
-          echo "Commit Hash: ${{github.env.COMMIT_HASH}}"
-          echo "Short Commit Hash: ${{github.env.SHORT_COMMIT_HASH}}"
+          echo "Commit Hash: ${{env.COMMIT_HASH}}"
+          echo "Short Commit Hash: ${{env.SHORT_COMMIT_HASH}}"
 
       - name: Get version tag
         continue-on-error: true
@@ -110,23 +110,24 @@ jobs:
         run: |
           if [[ ${{startsWith(inputs.stage, 'staging')}} ]]; then
             STAGE=$(echo "${{inputs.stage}}" | sed 's/staging//')
-            ENVIRONMENT=staging
-            STAGE_SHORT=st$STAGE
+            echo "ENVIRONMENT=staging" >> $GITHUB_ENV
+            echo "ENVIRONMENT=staging" >> $GITHUB_OUTPUT
+            echo "STAGE=$STAGE" >> $GITHUB_ENV
+            echo "STAGE=$STAGE" >> $GITHUB_OUTPUT
+            echo "STAGE_SHORT=st$STAGE" >> $GITHUB_ENV
+            echo "STAGE_SHORT=st$STAGE" >> $GITHUB_OUTPUT
           else
-            STAGE=${{inputs.stage}}
-            ENVIRONMENT=prod
-            STAGE_SHORT=$STAGE
+            echo "ENVIRONMENT=prod" >> $GITHUB_ENV
+            echo "ENVIRONMENT=prod" >> $GITHUB_OUTPUT
+            echo "STAGE=${{inputs.stage}}" >> $GITHUB_ENV
+            echo "STAGE=${{inputs.stage}}" >> $GITHUB_OUTPUT
+            echo "STAGE_SHORT=${{inputs.stage}}" >> $GITHUB_ENV
+            echo "STAGE_SHORT=${{inputs.stage}}" >> $GITHUB_OUTPUT
           fi
-          echo "ENVIRONMENT=$ENVIRONMENT" >> $GITHUB_ENV
-          echo "ENVIRONMENT=$ENVIRONMENT" >> $GITHUB_OUTPUT
-          echo "STAGE=$STAGE" >> $GITHUB_ENV
-          echo "STAGE=$STAGE" >> $GITHUB_OUTPUT
-          echo "STAGE_SHORT=$STAGE_SHORT" >> $GITHUB_ENV
-          echo "STAGE_SHORT=$STAGE_SHORT" >> $GITHUB_OUTPUT
 
-          echo "ENVIRONMENT=${{github.env.ENVIRONMENT}}"
-          echo "STAGE=${{github.env.STAGE}}"
-          echo "STAGE_SHORT=${{github.env.STAGE_SHORT}}"
+          echo "ENVIRONMENT: ${{env.ENVIRONMENT}}"
+          echo "STAGE: ${{env.STAGE}}"
+          echo "STAGE_SHORT: ${{env.STAGE_SHORT}}"
 
       - name: Extract branch name
         id: extract_branch
@@ -144,9 +145,9 @@ jobs:
           echo "SERVICE_NAME=$SERVICE_NAME"
           echo "SERVICE_NAME=$SERVICE_NAME" >> $GITHUB_ENV
           echo "SERVICE_NAME=$SERVICE_NAME" >> $GITHUB_OUTPUT
-          echo "PROJECT=$(echo $SERVICE_NAME-${{ github.env.environment }})"
-          echo "PROJECT=$(echo $SERVICE_NAME-${{ github.env.environment }})" >> $GITHUB_ENV
-          echo "PROJECT=$(echo $SERVICE_NAME-${{ github.env.environment }})" >> $GITHUB_OUTPUT
+          echo "PROJECT=$(echo $SERVICE_NAME-${{ env.ENVIRONMENT }})"
+          echo "PROJECT=$(echo $SERVICE_NAME-${{ env.ENVIRONMENT }})" >> $GITHUB_ENV
+          echo "PROJECT=$(echo $SERVICE_NAME-${{ env.ENVIRONMENT }})" >> $GITHUB_OUTPUT
 
   codebuild-check:
     runs-on: ${{ inputs.runner }}
