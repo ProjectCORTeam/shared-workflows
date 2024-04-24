@@ -107,27 +107,31 @@ jobs:
 
       - name: Get stage
         id: stage
+        env:
+          STAGE_INPUT: ${{ inputs.stage }}
         run: |
-          if [[ ${{startsWith(inputs.stage, 'staging')}} ]]; then
-            STAGE=$(echo "${{inputs.stage}}" | sed 's/staging//')
+          if [[ "$STAGE_INPUT" =~ ^staging([1-9]|10)?$ ]]; then
+            STAGE=${STAGE_INPUT/staging/}
             echo "ENVIRONMENT=staging" >> $GITHUB_ENV
             echo "ENVIRONMENT=staging" >> $GITHUB_OUTPUT
             echo "STAGE=$STAGE" >> $GITHUB_ENV
             echo "STAGE=$STAGE" >> $GITHUB_OUTPUT
             echo "STAGE_SHORT=st$STAGE" >> $GITHUB_ENV
             echo "STAGE_SHORT=st$STAGE" >> $GITHUB_OUTPUT
+            echo "Se está ejecutando como staging"
           else
+            echo "Se está ejecutando como prod"
             echo "ENVIRONMENT=prod" >> $GITHUB_ENV
             echo "ENVIRONMENT=prod" >> $GITHUB_OUTPUT
-            echo "STAGE=${{inputs.stage}}" >> $GITHUB_ENV
-            echo "STAGE=${{inputs.stage}}" >> $GITHUB_OUTPUT
-            echo "STAGE_SHORT=${{inputs.stage}}" >> $GITHUB_ENV
-            echo "STAGE_SHORT=${{inputs.stage}}" >> $GITHUB_OUTPUT
+            echo "STAGE=$STAGE_INPUT" >> $GITHUB_ENV
+            echo "STAGE=$STAGE_INPUT" >> $GITHUB_OUTPUT
+            echo "STAGE_SHORT=$STAGE_INPUT" >> $GITHUB_ENV
+            echo "STAGE_SHORT=$STAGE_INPUT" >> $GITHUB_OUTPUT
           fi
-
-          echo "ENVIRONMENT: ${{env.ENVIRONMENT}}"
-          echo "STAGE: ${{env.STAGE}}"
-          echo "STAGE_SHORT: ${{env.STAGE_SHORT}}"
+      
+          echo "ENVIRONMENT: $ENVIRONMENT"
+          echo "STAGE: $STAGE"
+          echo "STAGE_SHORT: $STAGE_SHORT"
 
       - name: Extract branch name
         id: extract_branch
