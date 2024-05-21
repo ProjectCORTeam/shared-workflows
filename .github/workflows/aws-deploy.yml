@@ -58,6 +58,11 @@ jobs:
               .infra/terraform/.terraform
             key: terraform-${{ inputs.stage }}
 
+        - name: Checking tree
+          shell: bash
+          run: |
+            tree ./
+
         - name: Install Terraform
           uses: little-core-labs/install-terraform@v2.0.0
           with:
@@ -82,12 +87,22 @@ jobs:
               templates
             fetch-depth: 1
 
+        - name: Checking tree
+          shell: bash
+          run: |
+            tree ./
+
         - name: Import service infra config
           uses: actions/checkout@v4
           with:
             sparse-checkout: |
               .infra/infra-config.json
             fetch-depth: 1
+
+        - name: Checking tree
+          shell: bash
+          run: |
+            tree ./
 
         - name: Setup Infra service
           shell: bash
@@ -106,6 +121,11 @@ jobs:
             find ./ -type f -exec sed -i '' 's/\$TEMPLATE_SERVICE_TYPE/$SERVICE_TYPE/g' {} +
             find ./ -type f -exec sed -i '' 's/\$TEMPLATE_SERVICE_NAME/$SERVICE_NAME/g' {} +
             find ./ -type f -exec sed -i '' 's/\$TEMPLATE_SERVICE_OWNER_TEAM/$SERVICE_OWNER/g' {} +
+        
+        - name: Checking tree
+          shell: bash
+          run: |
+            tree ./
 
         - name: Input preprocessing
           shell: bash
