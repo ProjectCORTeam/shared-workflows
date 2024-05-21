@@ -120,7 +120,6 @@ jobs:
             cp infra-config/.infra/infra-config.json .infra/infra-config.json
 
 
-            mkdir .infra/terraform
             cp infra-config/.infra/terraform/eventIAMPolicy.json .infra/terraform/eventIAMPolicy.json
             
             echo -e "\033[32mChecking infra config folder...........033[0m"
