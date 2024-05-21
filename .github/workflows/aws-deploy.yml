@@ -63,6 +63,8 @@ jobs:
           run: |
             ls -la
             ls -la .infra/terraform/.terraform
+            echo INFRA_TERRAFORM_VERSION=${{ env.INFRA_TERRAFORM_VERSION }}
+            echo INFRA_TERRAFORM_VERSION=${{ env.INFRA_TEMPLATES_VERSION }}
 
         - name: Install Terraform
           uses: little-core-labs/install-terraform@v2.0.0
