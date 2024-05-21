@@ -116,12 +116,10 @@ jobs:
         - name: Setup Infra service
           shell: bash
           run: |
-            ls -la
-            ls -la .infra/terraform
-            ls -la .infra
-
+            echo -e "\033[32mCopying infra-config file...........033[0m"
             cp infra-config/.infra/infra-config.json .infra/infra-config.json
             
+            echo -e "\033[32mChecking infra config folder...........033[0m"
             ls -la .infra
 
             SERVICE_NAME=$(jq -r '.name' .infra/infra-config.json)  
@@ -141,7 +139,8 @@ jobs:
             find ./ -type f -exec sed -i "s/\$TEMPLATE_SERVICE_TYPE/$SERVICE_TYPE/g" {} +
             find ./ -type f -exec sed -i "s/\$TEMPLATE_SERVICE_NAME/$SERVICE_NAME/g" {} +
             find ./ -type f -exec sed -i "s/\$TEMPLATE_SERVICE_OWNER_TEAM/$SERVICE_OWNER/g" {} +
-
+            
+            echo -e "\033[32mChecking infra config folder...........033[0m"
             ls -la .infra
 
         - name: Input preprocessing
