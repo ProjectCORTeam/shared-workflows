@@ -75,7 +75,7 @@ jobs:
         - name: Import Templates
           uses: actions/checkout@v4
           with:
-            repository: https://github.com/ProjectCORTeam/infra-service-templates
+            repository: ProjectCORTeam/infra-service-templates
             ref: ${{ env.INFRA_TEMPLATES_VERSION }}
             path: infra-templates
             sparse-checkout: |
