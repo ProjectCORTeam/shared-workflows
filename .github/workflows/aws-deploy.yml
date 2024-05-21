@@ -104,7 +104,7 @@ jobs:
         - name: Checking tree
           shell: bash
           run: |
-            ls -la ./infra-templates
+            ls -la
 
         - name: Import service infra config
           uses: actions/checkout@v4
@@ -117,6 +117,7 @@ jobs:
           shell: bash
           run: |
             ls -la .infra
+            ls -la
 
         - name: Setup Infra service
           shell: bash
