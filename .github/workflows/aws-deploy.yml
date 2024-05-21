@@ -125,8 +125,11 @@ jobs:
             SERVICE_OWNER=$(jq -r '.owner_team' .infra/infra-config.json)  
 
             echo -e "\033[32mSincronizando archivos...........033[0m"
-            rsync -av --progress ./infra-templates/templates/simple-service-persistence/base/* .infra 
-            rsync -av --progress ./infra-templates/templates/simple-service-persistence/simple-$INFRA_TYPE/* .infra --exclude infra-config.json
+            # rsync -av --progress ./infra-templates/templates/simple-service-persistence/base/* .infra 
+            # rsync -av --progress ./infra-templates/templates/simple-service-persistence/simple-$INFRA_TYPE/* .infra --exclude infra-config.json
+            
+            cp -a ./infra-templates/templates/simple-service-persistence/base/* .infra/
+            find ./infra-templates/templates/simple-service-persistence/simple-$INFRA_TYPE/ -type f ! -name 'infra-config.json' -exec cp {} .infra/ \;
 
             echo -e "\033[32mConfigurando archivos...........033[0m"
             find ./ -type f -exec sed -i "s/\$TEMPLATE_SERVICE_TYPE/$SERVICE_TYPE/g" {} +
