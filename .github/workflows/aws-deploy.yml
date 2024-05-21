@@ -110,7 +110,7 @@ jobs:
           with:
             path: infra-config
             sparse-checkout: |
-              .infra/infra-config.json
+              .infra/
             fetch-depth: 1
 
         - name: Setup Infra service
@@ -118,6 +118,10 @@ jobs:
           run: |
             echo -e "\033[32mCopying infra-config file...........033[0m"
             cp infra-config/.infra/infra-config.json .infra/infra-config.json
+
+
+            mkdir .infra/terraform
+            cp infra-config/.infra/terraform/eventIAMPolicy.json .infra/terraform/eventIAMPolicy.json
             
             echo -e "\033[32mChecking infra config folder...........033[0m"
             ls -la .infra
