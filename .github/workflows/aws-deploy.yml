@@ -115,7 +115,7 @@ jobs:
         - name: Setup Infra service
           shell: bash
           run: |
-            ls -la .infra/terraform/.terrafom
+            #ls -la .infra/terraform/.terrafom
             ls -la .infra
 
             SERVICE_NAME=$(jq -r '.name' .infra/infra-config.json)  
@@ -135,6 +135,8 @@ jobs:
             find ./ -type f -exec sed -i "s/\$TEMPLATE_SERVICE_TYPE/$SERVICE_TYPE/g" {} +
             find ./ -type f -exec sed -i "s/\$TEMPLATE_SERVICE_NAME/$SERVICE_NAME/g" {} +
             find ./ -type f -exec sed -i "s/\$TEMPLATE_SERVICE_OWNER_TEAM/$SERVICE_OWNER/g" {} +
+
+            ls -la .infra
 
         - name: Input preprocessing
           shell: bash
