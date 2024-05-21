@@ -61,8 +61,8 @@ jobs:
         - name: Checking tree
           shell: bash
           run: |
-            sudo apt-get install tree
-            tree ./
+            ls -la
+            ls -la .infra/terraform/.terraform
 
         - name: Install Terraform
           uses: little-core-labs/install-terraform@v2.0.0
@@ -91,7 +91,7 @@ jobs:
         - name: Checking tree
           shell: bash
           run: |
-            tree ./
+            ls -la ./infra-templates
 
         - name: Import service infra config
           uses: actions/checkout@v4
@@ -103,7 +103,7 @@ jobs:
         - name: Checking tree
           shell: bash
           run: |
-            tree ./
+            ls -la .infra
 
         - name: Setup Infra service
           shell: bash
@@ -126,7 +126,7 @@ jobs:
         - name: Checking tree
           shell: bash
           run: |
-            tree ./
+            ls -la .infra
 
         - name: Input preprocessing
           shell: bash
