@@ -141,6 +141,7 @@ jobs:
             find ./ -type f -exec sed -i "s/\$TEMPLATE_SERVICE_OWNER_TEAM/$SERVICE_OWNER/g" {} +
             
             echo -e "\033[32mChecking infra config folder...........033[0m"
+            cat .infra/infra-config.json
             ls -la .infra
 
         - name: Input preprocessing
