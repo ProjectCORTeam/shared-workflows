@@ -115,7 +115,7 @@ jobs:
         - name: Setup Infra service
           shell: bash
           run: |
-            #ls -la .infra/terraform/.terrafom
+            ls -la
             ls -la .infra
 
             SERVICE_NAME=$(jq -r '.name' .infra/infra-config.json)  
