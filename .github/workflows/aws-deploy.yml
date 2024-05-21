@@ -104,6 +104,7 @@ jobs:
         - name: Setup Infra service
           shell: bash
           run: |
+            mkdir .infra
             cp ./infra-config/.infra/infra-config.json .infra/infra-config.json
 
             SERVICE_NAME=$(jq -r '.name' .infra/infra-config.json)  
