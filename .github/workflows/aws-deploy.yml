@@ -130,9 +130,9 @@ jobs:
             rsync -av --progress ./infra-templates/templates/cicd/ ./
 
             echo -e "\033[32mConfigurando archivos...........033[0m"
-            find ./ -type f -exec sed -i "s/\$TEMPLATE_SERVICE_TYPE/${{ env.SERVICE_TYPE }}/g" {} +
-            find ./ -type f -exec sed -i "s/\$TEMPLATE_SERVICE_NAME/${{ env.SERVICE_NAME }}/g" {} +
-            find ./ -type f -exec sed -i "s/\$TEMPLATE_SERVICE_OWNER_TEAM/${{ env.SERVICE_OWNER }}/g" {} +
+            find ./ -type f -exec sed -i "s/\$TEMPLATE_SERVICE_TYPE/$SERVICE_TYPE/g" {} +
+            find ./ -type f -exec sed -i "s/\$TEMPLATE_SERVICE_NAME/$SERVICE_NAME/g" {} +
+            find ./ -type f -exec sed -i "s/\$TEMPLATE_SERVICE_OWNER_TEAM/$SERVICE_OWNER/g" {} +
 
             cat .infra/kubernetes/service/Chart.yaml
             cat .infra/terraform/backend.tf
