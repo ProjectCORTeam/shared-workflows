@@ -96,7 +96,7 @@ jobs:
             repository: ProjectCORTeam/infra-service-templates
             ref: ${{ inputs.infra_templates_version }}
             path: infra-templates
-            token: ${{ secrets.GITHUB_TOKEN }}
+            token: ${{ secrets.ACTIONS_TOKEN }}
             sparse-checkout: |
               templates
             fetch-depth: 1
