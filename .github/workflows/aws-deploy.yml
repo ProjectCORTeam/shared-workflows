@@ -107,7 +107,7 @@ jobs:
         - name: Import service infra config
           uses: actions/checkout@v4
           with:
-            path: infra-config
+            #path: infra-config
             sparse-checkout: |
               .infra/infra-config.json
             fetch-depth: 1
@@ -115,7 +115,8 @@ jobs:
         - name: Setup Infra service
           shell: bash
           run: |
-            cp ./infra-config/.infra/infra-config.json .infra/infra-config.json
+            cat .infra/infra-config
+            #cp ./infra-config/.infra/infra-config.json .infra/infra-config.json
 
             SERVICE_NAME=$(jq -r '.name' .infra/infra-config.json)  
             #INFRA_TYPE=$(jq -r '.deployment_type' .infra/infra-config.json)
