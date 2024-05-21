@@ -61,12 +61,12 @@ jobs:
       name: "Terraform"
       runs-on: ${{ inputs.runner }}
       steps:
-        # - name: Cache Terraform files
-        #   uses: actions/cache@v3
-        #   with:
-        #     path: |
-        #       .infra/terraform/.terraform
-        #     key: terraform-${{ inputs.stage }}
+        - name: Cache Terraform files
+          uses: actions/cache@v4
+          with:
+            path: |
+              .infra/terraform/.terraform
+            key: terraform-${{ inputs.stage }}
 
         - name: Install Terraform
           uses: little-core-labs/install-terraform@v2.0.0
@@ -108,7 +108,7 @@ jobs:
         - name: Import service infra config
           uses: actions/checkout@v4
           with:
-            #path: infra-config
+            path: infra-config
             sparse-checkout: |
               .infra/infra-config.json
             fetch-depth: 1
@@ -117,6 +117,11 @@ jobs:
           shell: bash
           run: |
             ls -la
+            ls -la .infra/terraform
+            ls -la .infra
+
+            cp infra-config/.infra/infra-config.json .infra/infra-config.json
+            
             ls -la .infra
 
             SERVICE_NAME=$(jq -r '.name' .infra/infra-config.json)  
