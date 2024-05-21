@@ -125,7 +125,8 @@ jobs:
             cp ./infra-config/.infra/infra-config.json .infra/infra-config.json
 
             SERVICE_NAME=$(jq -r '.name' .infra/infra-config.json)  
-            INFRA_TYPE=$(jq -r '.deployment_type' .infra/infra-config.json)  
+            #INFRA_TYPE=$(jq -r '.deployment_type' .infra/infra-config.json)
+            INFRA_TYPE=$(jq -r '.deployment_type' .infra/infra-config.json | tr '[:upper:]' '[:lower:]')
             SERVICE_TYPE=$(jq -r '.type' .infra/infra-config.json)  
             SERVICE_OWNER=$(jq -r '.owner_team' .infra/infra-config.json)  
 
