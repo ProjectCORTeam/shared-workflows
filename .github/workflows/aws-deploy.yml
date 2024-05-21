@@ -199,12 +199,11 @@ jobs:
             else \
               #jq --argjson new_env '{"new_env": ${{ inputs.new_stage }}' --arg commit_id "$(git rev-parse --short HEAD)" '.commit_id += $commit_id | (.env_settings[]) += {new_env: false} | .env_settings |= map(if .stage == "${{env.STAGE}}" then . += $new_env else . end)' infra-config.json > ./terraform/terraform.auto.tfvars.json
               jq --arg new_env "${{ inputs.new_stage }}" \
-                  --arg commit_id "d918152" \
-                  --arg stage "${{ env.STAGE }}" \
-                  '.commit_id = $commit_id | 
-                   .env_settings[] |= (if .stage == $stage then . + {"new_env": $new_env | fromjson} else . end) | 
-                   .env_settings |= map(if .stage == $stage then .new_env = false else . end)' \
-                  infra-config.json > ./terraform/terraform.auto.tfvars.json
+                --arg commit_id "$(git rev-parse --short HEAD)" \
+                '.commit_id = $commit_id | 
+                  .env_settings[] += {"new_env": $new_env} | 
+                  .env_settings |= map(.new_env = false)' \
+                infra-config.json > ./terraform/terraform.auto.tfvars.json
 
             fi
             terraform fmt
