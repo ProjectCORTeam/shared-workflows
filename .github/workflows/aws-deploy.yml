@@ -61,6 +61,7 @@ jobs:
         - name: Checking tree
           shell: bash
           run: |
+            sudo apt-get install tree
             tree ./
 
         - name: Install Terraform
