@@ -76,18 +76,18 @@ jobs:
           uses: actions/checkout@v4
           with:
             repository: ProjectCORTeam/infra-service-templates
-            ref: ${{ env.INFRA_TEMPLATES_VERSION }}
+            ref: '${{ env.INFRA_TEMPLATES_VERSION }}'
             path: infra-templates
             sparse-checkout: |
               templates
-            fetch-depth: 0
+            fetch-depth: 1
 
         - name: Import service infra config
           uses: actions/checkout@v4
           with:
             sparse-checkout: |
               .infra/infra-config.json
-            fetch-depth: 0
+            fetch-depth: 1
 
         - name: Setup Infra service
           shell: bash
