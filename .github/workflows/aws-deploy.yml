@@ -115,8 +115,8 @@ jobs:
         - name: Setup Infra service
           shell: bash
           run: |
-            cat .infra/infra-config.json
-            #cp ./infra-config/.infra/infra-config.json .infra/infra-config.json
+            ls -la .infra/terraform/.terrafom
+            ls -la .infra
 
             SERVICE_NAME=$(jq -r '.name' .infra/infra-config.json)  
             #INFRA_TYPE=$(jq -r '.deployment_type' .infra/infra-config.json)
@@ -125,9 +125,8 @@ jobs:
             SERVICE_OWNER=$(jq -r '.owner_team' .infra/infra-config.json)  
 
             echo -e "\033[32mSincronizando archivos...........033[0m"
-            rsync -av --progress ./infra-templates/templates/simple-service-persistence/base/* ./.infra 
-            rsync -av --progress ./infra-templates/templates/simple-service-persistence/simple-$INFRA_TYPE/* ./.infra --exclude infra-config.json
-            rsync -av --progress ./infra-templates/templates/cicd/ ./
+            rsync -av --progress ./infra-templates/templates/simple-service-persistence/base/* .infra 
+            rsync -av --progress ./infra-templates/templates/simple-service-persistence/simple-$INFRA_TYPE/* .infra --exclude infra-config.json
 
             echo -e "\033[32mConfigurando archivos...........033[0m"
             find ./ -type f -exec sed -i "s/\$TEMPLATE_SERVICE_TYPE/$SERVICE_TYPE/g" {} +
