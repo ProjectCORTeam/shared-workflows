@@ -117,22 +117,18 @@ jobs:
           shell: bash
           run: |
 
-            echo -e "\033[32mChecking infra config folder...........033[0m"
-            ls -la .infra
-            
-            SERVICE_NAME=$(jq -r '.name' .infra/infra-config.json)  
-            #INFRA_TYPE=$(jq -r '.deployment_type' .infra/infra-config.json)
-            INFRA_TYPE=$(jq -r '.deployment_type' .infra/infra-config.json | tr '[:upper:]' '[:lower:]')
-            SERVICE_TYPE=$(jq -r '.type' .infra/infra-config.json)  
-            SERVICE_OWNER=$(jq -r '.owner_team' .infra/infra-config.json)  
-            
-            echo -e "\033[32mSincronizando archivos...........033[0m"
+            echo -e "\033[32mSincronizando archivos...........\033[0m"
             # rsync -av --progress ./infra-templates/templates/simple-service-persistence/base/* .infra 
             rsync -av --progress ./infra-templates/templates/simple-service-persistence/simple-$INFRA_TYPE/* .infra --exclude infra-config.json
             
-            echo -e "\033[32mOverride terraform files...........033[0m"
+            echo -e "\033[32mOverride terraform files...........\033[0m"
             rsync -av --progress ./infra-config/.infra/* .infra
-            
+
+            SERVICE_NAME=$(jq -r '.name' .infra/infra-config.json)  
+            INFRA_TYPE=$(jq -r '.deployment_type' .infra/infra-config.json | tr '[:upper:]' '[:lower:]')
+            SERVICE_TYPE=$(jq -r '.type' .infra/infra-config.json)  
+            SERVICE_OWNER=$(jq -r '.owner_team' .infra/infra-config.json)  
+
             cp -a ./infra-templates/templates/simple-service-persistence/base/* .infra/
             #find ./infra-templates/templates/simple-service-persistence/simple-$INFRA_TYPE/ -type f ! -name 'infra-config.json' -exec cp {} .infra/ \;
 
@@ -140,10 +136,6 @@ jobs:
             find ./ -type f -exec sed -i "s/\$TEMPLATE_SERVICE_TYPE/$SERVICE_TYPE/g" {} +
             find ./ -type f -exec sed -i "s/\$TEMPLATE_SERVICE_NAME/$SERVICE_NAME/g" {} +
             find ./ -type f -exec sed -i "s/\$TEMPLATE_SERVICE_OWNER_TEAM/$SERVICE_OWNER/g" {} +
-            
-            echo -e "\033[32mChecking infra config folder...........033[0m"
-            cat .infra/infra-config.json
-            ls -la .infra
 
         - name: Input preprocessing
           shell: bash
@@ -193,7 +185,7 @@ jobs:
           run: |
 
             if [ ${{env.STAGE}} == 'production' ] || [ ${{env.STAGE}} == 'beta' ]; then \
-              jq --argjson new_env '{"new_env": ${{ inputs.new_stage }}' --arg commit_id "$(git rev-parse --short HEAD)" --arg version ${{inputs.release_version}} '.commit_id += $commit_id | (.env_settings[]) += {new_env: false} | .env_settings |= map(if .stage == "${{env.STAGE}}" then . += $new_env + {release_version: $version} else . end)' infra-config.json > ./terraform/terraform.auto.tfvars.json              
+              jq --argjson new_env '{"new_env": ${{ inputs.new_stage }}' --arg commit_id "${GITHUB_SHA::7}" --arg version ${{inputs.release_version}} '.commit_id += $commit_id | (.env_settings[]) += {new_env: false} | .env_settings |= map(if .stage == "${{env.STAGE}}" then . += $new_env + {release_version: $version} else . end)' infra-config.json > ./terraform/terraform.auto.tfvars.json              
             else \
               #jq --argjson new_env '{"new_env": ${{ inputs.new_stage }}' --arg commit_id "$(git rev-parse --short HEAD)" '.commit_id += $commit_id | (.env_settings[]) += {new_env: false} | .env_settings |= map(if .stage == "${{env.STAGE}}" then . += $new_env else . end)' infra-config.json > ./terraform/terraform.auto.tfvars.json
               jq --arg new_env "${{ inputs.new_stage }}" \
