@@ -32,6 +32,16 @@ on:
         type: boolean
         default: true
         description: "Enable notifications to cloud or team owner flag"
+      infra_templates_version:
+          required: false
+          type: string
+          default: master
+          description: "Infra template version for get all configuration files"
+      infra_terraform_version:
+        required: false
+        type: string
+        default: 1.7.4
+        description: "Terraform version client"
     secrets: 
       CICD_AWS_ACCESS_KEY_ID:
         required: true
@@ -51,10 +61,18 @@ jobs:
       name: "Terraform"
       runs-on: ${{ inputs.runner }}
       steps:
+        - name: Cache Terraform files
+          uses: actions/cache@v4
+          with:
+            path: |
+              .infra/terraform/.terraform
+            key: terraform-${{ inputs.stage }}
+
         - name: Install Terraform
           uses: little-core-labs/install-terraform@v2.0.0
           with:
-              version: 1.7.4
+              version: ${{ inputs.infra_terraform_version }}
+
         - name: Setup Terraform
           shell: bash
           run: |
@@ -63,11 +81,63 @@ jobs:
               token = "${{ secrets.TF_API_TOKEN }}"
             }
             EOL
-    
-        - name: Checkout
-          uses: actions/checkout@v4
+            #echo "TF_PLUGIN_CACHE_DIR=$HOME/.terraform.d/plugin-cache" >>"$GITHUB_ENV"
+            #mkdir --parents "$HOME/.terraform.d/plugin-cache"
 
-        #- uses: terraform-cache/terraform-cache@v1
+        - name: Cache Terraform
+          uses: actions/cache@v4
+          if: false
+          with:
+            path: |
+              ~/.terraform.d/plugin-cache
+            key: terraform-${{ runner.os }}-${{ hashFiles('**/.terraform.lock.hcl') }}
+            restore-keys: |
+              terraform-${{ runner.os }}-
+
+        - name: Import Templates
+          uses: actions/checkout@v4
+          with:
+            repository: ProjectCORTeam/infra-service-templates
+            ref: ${{ inputs.infra_templates_version }}
+            path: infra-templates
+            token: ${{ secrets.ACTIONS_TOKEN }}
+            sparse-checkout: |
+              templates
+            fetch-depth: 1
+
+        - name: Import service infra config
+          uses: actions/checkout@v4
+          with:
+            path: infra-config
+            sparse-checkout: |
+              .infra/
+            fetch-depth: 1
+
+        - name: Setup Infra service files
+          shell: bash
+          run: |
+          
+            cp ./infra-config/.infra/infra-config.json .infra/infra-config.json
+            
+            SERVICE_NAME=$(jq -r '.name' .infra/infra-config.json)  
+            INFRA_TYPE=$(jq -r '.deployment_type' .infra/infra-config.json | tr '[:upper:]' '[:lower:]')
+            SERVICE_TYPE=$(jq -r '.type' .infra/infra-config.json)  
+            SERVICE_OWNER=$(jq -r '.owner_team' .infra/infra-config.json)  
+            
+            echo -e "\033[32mSincronizando archivos...........\033[0m"
+            # rsync -av --progress ./infra-templates/templates/simple-service-persistence/base/* .infra 
+            rsync -av --progress ./infra-templates/templates/simple-service-persistence/simple-$INFRA_TYPE/* .infra --exclude infra-config.json
+          
+            echo -e "\033[32mOverride terraform files...........\033[0m"
+            rsync -av --progress ./infra-config/.infra/* .infra --exclude infra-config.json
+
+            cp -a ./infra-templates/templates/simple-service-persistence/base/* .infra/
+            #find ./infra-templates/templates/simple-service-persistence/simple-$INFRA_TYPE/ -type f ! -name 'infra-config.json' -exec cp {} .infra/ \;
+
+            echo -e "\033[32mConfigurando archivos...........033[0m"
+            find ./ -type f -exec sed -i "s/\$TEMPLATE_SERVICE_TYPE/$SERVICE_TYPE/g" {} +
+            find ./ -type f -exec sed -i "s/\$TEMPLATE_SERVICE_NAME/$SERVICE_NAME/g" {} +
+            find ./ -type f -exec sed -i "s/\$TEMPLATE_SERVICE_OWNER_TEAM/$SERVICE_OWNER/g" {} +
 
         - name: Input preprocessing
           shell: bash
@@ -115,10 +185,18 @@ jobs:
           shell: bash
           working-directory: .infra
           run: |
+
             if [ ${{env.STAGE}} == 'production' ] || [ ${{env.STAGE}} == 'beta' ]; then \
-              jq --argjson new_env '{"new_env": ${{ inputs.new_stage }}}' --arg commit_id "$(git rev-parse --short HEAD)" --arg version ${{inputs.release_version}} '.commit_id += $commit_id | (.env_settings[]) += {new_env: false} | .env_settings |= map(if .stage == "${{env.STAGE}}" then . += $new_env + {release_version: $version} else . end)' infra-config.json > ./terraform/terraform.auto.tfvars.json              
+              jq --argjson new_env '{"new_env": ${{ inputs.new_stage }}' --arg commit_id "${GITHUB_SHA::7}" --arg version ${{inputs.release_version}} '.commit_id += $commit_id | (.env_settings[]) += {new_env: false} | .env_settings |= map(if .stage == "${{env.STAGE}}" then . += $new_env + {release_version: $version} else . end)' infra-config.json > ./terraform/terraform.auto.tfvars.json              
             else \
-              jq --argjson new_env '{"new_env": ${{ inputs.new_stage }}}' --arg commit_id "$(git rev-parse --short HEAD)" '.commit_id += $commit_id | (.env_settings[]) += {new_env: false} | .env_settings |= map(if .stage == "${{env.STAGE}}" then . += $new_env else . end)' infra-config.json > ./terraform/terraform.auto.tfvars.json
+              #jq --argjson new_env '{"new_env": ${{ inputs.new_stage }}' --arg commit_id "$(git rev-parse --short HEAD)" '.commit_id += $commit_id | (.env_settings[]) += {new_env: false} | .env_settings |= map(if .stage == "${{env.STAGE}}" then . += $new_env else . end)' infra-config.json > ./terraform/terraform.auto.tfvars.json
+              jq --arg new_env "${{ inputs.new_stage }}" \
+                --arg commit_id "${GITHUB_SHA::7}" \
+                '.commit_id = $commit_id | 
+                  .env_settings[] += {"new_env": $new_env} | 
+                  .env_settings |= map(.new_env = false)' \
+                infra-config.json > ./terraform/terraform.auto.tfvars.json
+
             fi
             terraform fmt
             cat ./terraform/terraform.auto.tfvars.json
