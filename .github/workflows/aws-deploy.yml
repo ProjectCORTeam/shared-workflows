@@ -35,7 +35,7 @@ on:
       infra_templates_version:
           required: false
           type: string
-          default: master
+          default: feat/dynamic-templates-init
           description: "Infra template version for get all configuration files"
       infra_terraform_version:
         required: false
