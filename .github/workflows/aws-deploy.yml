@@ -191,7 +191,14 @@ jobs:
           run: |
 
             if [ ${{env.STAGE}} == 'production' ] || [ ${{env.STAGE}} == 'beta' ]; then \
-              jq --argjson new_env '{"new_env": ${{ inputs.new_stage }}' --arg commit_id "${GITHUB_SHA::7}" --arg version ${{inputs.release_version}} '.commit_id += $commit_id | (.env_settings[]) += {new_env: false} | .env_settings |= map(if .stage == "${{env.STAGE}}" then . += $new_env + {release_version: $version} else . end)' infra-config.json > ./terraform/terraform.auto.tfvars.json              
+              #jq --argjson new_env '{"new_env": ${{ inputs.new_stage }}' --arg commit_id "${GITHUB_SHA::7}" --arg version ${{inputs.release_version}} '.commit_id += $commit_id | (.env_settings[]) += {new_env: false} | .env_settings |= map(if .stage == "${{env.STAGE}}" then . += $new_env + {release_version: $version} else . end)' infra-config.json > ./terraform/terraform.auto.tfvars.json              
+              jq --arg new_env "${{ inputs.new_stage }}" \
+                  --arg commit_id "${GITHUB_SHA::7}" \
+                  --arg version "${{ inputs.release_version }}" \
+                  '.commit_id += $commit_id | 
+                    .env_settings[] += {"new_env": false} | 
+                    .env_settings |= map(if .stage == "${{ env.STAGE }}" then . += {"new_env": $new_env, "release_version": $version} else . end)' \
+                  infra-config.json > ./terraform/terraform.auto.tfvars.json
             else \
               #jq --argjson new_env '{"new_env": ${{ inputs.new_stage }}' --arg commit_id "$(git rev-parse --short HEAD)" '.commit_id += $commit_id | (.env_settings[]) += {new_env: false} | .env_settings |= map(if .stage == "${{env.STAGE}}" then . += $new_env else . end)' infra-config.json > ./terraform/terraform.auto.tfvars.json
               jq --arg new_env "${{ inputs.new_stage }}" \
