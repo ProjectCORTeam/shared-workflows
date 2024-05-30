@@ -251,14 +251,26 @@ jobs:
         - name: Terraform Plan Beta
           if: github.event_name == 'pull_request' && contains( github.base_ref, 'beta' )
           id: plan-beta
-          run: terraform plan -no-color -input=false -target='module.shared' -target='module.prod["beta"]'
+          run: | 
+            terraform plan -no-color -input=false \
+            -target='module.shared' \
+            -target='module.prod["beta"]' \
+            -var="account_id_list=${{secrets.TF_VAR_ACCOUNT_ID_LIST}}" \
+            -var="terraform_role_name=${{secrets.TF_VAR_TERRAFORM_ROLE_NAME}}" \
+            -var="github_token=${{secrets.TF_VAR_GITHUB_TOKEN}}"
           continue-on-error: true
           working-directory: .infra/terraform
         
         - name: Terraform Plan Prod
           if: github.event_name == 'pull_request' && contains( github.base_ref, 'master' )
           id: plan-prod
-          run: terraform plan -no-color -input=false -target='module.shared' -target='module.prod["production"]'
+          run: | 
+            terraform plan -no-color -input=false \
+            -target='module.shared' \
+            -target='module.prod["production"]' \
+            -var="account_id_list=${{secrets.TF_VAR_ACCOUNT_ID_LIST}}" \
+            -var="terraform_role_name=${{secrets.TF_VAR_TERRAFORM_ROLE_NAME}}" \
+            -var="github_token=${{secrets.TF_VAR_GITHUB_TOKEN}}"
           continue-on-error: true
           working-directory: .infra/terraform
 
@@ -273,13 +285,25 @@ jobs:
         - name: Terraform Apply Beta
           if: github.event_name == 'release' && env.STAGE == 'beta'
           id: infra-apply-beta
-          run: terraform apply -auto-approve -input=false -target='module.shared' -target='module.prod["beta"]'
+          run: |
+            terraform apply -auto-approve -input=false \
+            -target='module.shared' \
+            -target='module.prod["beta"]' \
+            -var="account_id_list=${{secrets.TF_VAR_ACCOUNT_ID_LIST}}" \
+            -var="terraform_role_name=${{secrets.TF_VAR_TERRAFORM_ROLE_NAME}}" \
+            -var="github_token=${{secrets.TF_VAR_GITHUB_TOKEN}}"
           working-directory: .infra/terraform
 
         - name: Terraform Apply Prod
           if: github.event_name == 'release' && env.STAGE == 'production'
           id: infra-apply-production
-          run: terraform apply -auto-approve -input=false -target='module.shared' -target='module.prod["production"]'
+          run: | 
+            terraform apply -auto-approve -input=false \
+            -target='module.shared' \
+            -target='module.prod["production"]'  \
+            -var="account_id_list=${{secrets.TF_VAR_ACCOUNT_ID_LIST}}" \
+            -var="terraform_role_name=${{secrets.TF_VAR_TERRAFORM_ROLE_NAME}}" \
+            -var="github_token=${{secrets.TF_VAR_GITHUB_TOKEN}}"
           working-directory: .infra/terraform
 
         - name: Google Chat Notification - Beta
