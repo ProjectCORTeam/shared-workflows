@@ -300,7 +300,8 @@ jobs:
           projectName: ${{ env.CODEBUILD_PROJECT }}
           buildspec: '{
               "environmentVariablesOverride":[
-                { "name":"RELEASE_VERSION", "value":"${{ env.RELEASE_VERSION }}", "type": "PLAINTEXT" }
+                { "name":"RELEASE_VERSION", "value":"${{ env.RELEASE_VERSION }}", "type": "PLAINTEXT" },
+                { "name":"INFRA_TEMPLATE_VERSION", "value":"${{ inputs.infra_templates_version }}", "type": "PLAINTEXT" }
               ]
             }'
 
