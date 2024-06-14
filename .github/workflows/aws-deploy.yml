@@ -1,5 +1,4 @@
 name: AWS Deploy
-
 on: 
   workflow_call:
     inputs: 
@@ -254,6 +253,7 @@ jobs:
         - name: Terraform Plan Beta
           if: github.event_name == 'pull_request' && contains( github.base_ref, 'beta' )
           id: plan-beta
+          run: |
             terraform plan -no-color -input=false \
             -target='module.shared' \
             -target='module.prod["beta"]' \

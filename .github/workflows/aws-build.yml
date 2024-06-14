@@ -23,11 +23,6 @@ on:
           type: string
           default: master
           description: "Infra template version for get all configuration files"
-      infra_terraform_version:
-        required: false
-        type: string
-        default: 1.7.4
-        description: "Terraform version client"
     outputs:
       new_stage:
         description: "New stage deployment check flag"
@@ -53,8 +48,6 @@ on:
         required: true
       GOOGLE_WEBHOOK:
         required: true
-      ACTIONS_TOKEN:
-        required: true
 
 jobs:
   aws-build:
@@ -72,78 +65,6 @@ jobs:
         uses: actions/checkout@v3
         with:
           fetch-depth: 1
-
-      - name: Import Templates
-        uses: actions/checkout@v4
-        with:
-          repository: ProjectCORTeam/infra-service-templates
-          ref: ${{ inputs.infra_templates_version }}
-          path: infra-templates
-          token: ${{ secrets.ACTIONS_TOKEN }}
-          sparse-checkout: |
-            templates
-          fetch-depth: 1
-
-      - name: Import service infra config
-        uses: actions/checkout@v4
-        with:
-          path: infra-config
-          sparse-checkout: |
-            .infra/
-          fetch-depth: 1
-
-      - name: Setup Infra service
-        shell: bash
-        run: |
-
-          echo -e "\033[32mChecking infra config folder...........033[0m"
-          ls -la .infra
-          
-          SERVICE_NAME=$(jq -r '.name' .infra/infra-config.json)  
-          #INFRA_TYPE=$(jq -r '.deployment_type' .infra/infra-config.json)
-          INFRA_TYPE=$(jq -r '.deployment_type' .infra/infra-config.json | tr '[:upper:]' '[:lower:]')
-          SERVICE_TYPE=$(jq -r '.type' .infra/infra-config.json)  
-          SERVICE_OWNER=$(jq -r '.owner_team' .infra/infra-config.json)  
-          
-          echo -e "\033[32mSincronizando archivos...........033[0m"
-          # rsync -av --progress ./infra-templates/templates/simple-service-persistence/base/* .infra 
-          rsync -av --progress ./infra-templates/templates/simple-service-persistence/simple-$INFRA_TYPE/* .infra --exclude infra-config.json
-          
-          echo -e "\033[32mOverride terraform files...........033[0m"
-          rsync -av --progress ./infra-config/.infra/* .infra
-          
-          cp -a ./infra-templates/templates/simple-service-persistence/base/* .infra/
-          #find ./infra-templates/templates/simple-service-persistence/simple-$INFRA_TYPE/ -type f ! -name 'infra-config.json' -exec cp {} .infra/ \;
-
-          echo -e "\033[32mConfigurando archivos...........033[0m"
-          find ./ -type f -exec sed -i "s/\$TEMPLATE_SERVICE_TYPE/$SERVICE_TYPE/g" {} +
-          find ./ -type f -exec sed -i "s/\$TEMPLATE_SERVICE_NAME/$SERVICE_NAME/g" {} +
-          find ./ -type f -exec sed -i "s/\$TEMPLATE_SERVICE_OWNER_TEAM/$SERVICE_OWNER/g" {} +
-          
-          echo -e "\033[32mChecking infra config folder...........033[0m"
-          cat .infra/infra-config.json
-          ls -la .infra
-
-
-      - id: install-aws-cli
-        uses: unfor19/install-aws-cli-action@v1
-        with:
-          version: 2     # default
-          verbose: false # default
-          arch: amd64    # allowed values: amd64, arm64
-
-      - name: Get Commit Hash
-        id: get-commit-ids
-        if: contains(fromJson('["workflow_dispatch"]'), inputs.trigger_type)
-        run: |
-          commit_hash=$(git rev-parse ${{ github.ref }})
-          echo "COMMIT_HASH=$commit_hash" >> $GITHUB_ENV &&
-
-          short_commit_hash=$(echo $commit_hash | cut -c 1-7)
-          echo "SHORT_COMMIT_HASH=$short_commit_hash" >> $GITHUB_ENV &&
-
-          echo "Commit Hash: $commit_hash"
-          echo "Short Commit Hash: $short_commit_hash"
 
       - name: Get Commit Hash
         id: get-commit-ids
