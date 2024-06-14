@@ -18,6 +18,11 @@ on:
         type: boolean
         default: true
         description: "Enable notifications to cloud or team owner flag"
+      infra_templates_version:
+          required: false
+          type: string
+          default: master
+          description: "Infra template version for get all configuration files"
     outputs:
       new_stage:
         description: "New stage deployment check flag"
@@ -59,7 +64,7 @@ jobs:
         if: contains(fromJson('["push", "release", "pull_request", "workflow_dispatch"]'), github.event_name)
         uses: actions/checkout@v3
         with:
-          fetch-depth: 0
+          fetch-depth: 1
 
       - name: Get Commit Hash
         id: get-commit-ids
@@ -229,7 +234,8 @@ jobs:
           projectName: ${{ env.CODEBUILD_PROJECT }}
           buildspec: '{
               "environmentVariablesOverride":[
-                { "name":"RELEASE_VERSION", "value":"${{ env.RELEASE_VERSION }}", "type": "PLAINTEXT" }
+                { "name":"RELEASE_VERSION", "value":"${{ env.RELEASE_VERSION }}", "type": "PLAINTEXT" },
+                { "name":"INFRA_TEMPLATE_VERSION", "value":"${{ inputs.infra_templates_version }}", "type": "PLAINTEXT" }
               ]
             }'
 
