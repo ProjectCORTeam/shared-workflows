@@ -179,7 +179,6 @@ jobs:
             export TF_VAR_account_id_list='${{secrets.TF_VAR_ACCOUNT_ID_LIST}}'
             export TF_VAR_terraform_role_name="${{secrets.TF_VAR_TERRAFORM_ROLE_NAME}}"
             export TF_VAR_github_token="${{secrets.TF_VAR_GITHUB_TOKEN}}"
-
             echo TF_VAR_account_id_list
             echo TF_VAR_terraform_role_name
 
@@ -189,7 +188,6 @@ jobs:
           shell: bash
           working-directory: .infra
           run: |
-
             if [ ${{env.STAGE}} == 'production' ] || [ ${{env.STAGE}} == 'beta' ]; then \
               #jq --argjson new_env '{"new_env": ${{ inputs.new_stage }}' --arg commit_id "${GITHUB_SHA::7}" --arg version ${{inputs.release_version}} '.commit_id += $commit_id | (.env_settings[]) += {new_env: false} | .env_settings |= map(if .stage == "${{env.STAGE}}" then . += $new_env + {release_version: $version} else . end)' infra-config.json > ./terraform/terraform.auto.tfvars.json              
               jq --arg new_env "${{ inputs.new_stage }}" \
@@ -207,10 +205,15 @@ jobs:
                   .env_settings[] += {"new_env": $new_env} | 
                   .env_settings |= map(.new_env = false)' \
                 infra-config.json > ./terraform/terraform.auto.tfvars.json
-
             fi
             terraform fmt
             cat ./terraform/terraform.auto.tfvars.json
+
+        - name: Setup Terraform
+          uses: hashicorp/setup-terraform@v2
+          with:
+            terraform_version: 1.7.4
+            cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
 
         - name: Terraform Format
           id: fmt
@@ -251,7 +254,6 @@ jobs:
         - name: Terraform Plan Beta
           if: github.event_name == 'pull_request' && contains( github.base_ref, 'beta' )
           id: plan-beta
-          run: | 
             terraform plan -no-color -input=false \
             -target='module.shared' \
             -target='module.prod["beta"]' \
