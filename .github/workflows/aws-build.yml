@@ -266,7 +266,6 @@ jobs:
 
       - name: Output checks
         shell: bash
-        working-directory: .infra/terraform
         run: |
           echo "new_stage: " ${{ steps.check-project.outputs.new_stage }}
           echo "stage_check: " ${{ steps.check-project.outputs.project_exist }}
