@@ -121,7 +121,7 @@ jobs:
             BRANCH_NAME=${{ github.base_ref}}
             echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV ; \
           else \
-            BRANCH_NAME=$(git branch -r --contains ${{github.sha}} | cut -d/ -f 2) &&
+            BRANCH_NAME=$(git branch -r --contains ${{github.sha}} | cut -d/ -f 2) ; \
             echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV ; \
           fi
 
