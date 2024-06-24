@@ -204,8 +204,6 @@ jobs:
             fi
             terraform fmt
             cat ./terraform/terraform.auto.tfvars.json
-            ls -la 
-            ls -la ./terraform
 
         - name: Setup Terraform
           uses: hashicorp/setup-terraform@v2
@@ -213,15 +211,17 @@ jobs:
             terraform_version: 1.7.4
             cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
 
-        # - name: Terraform Format
-        #   id: fmt
-        #   run: terraform fmt -check -recursive -diff
-        #   working-directory: .infra/terraform
+        - name: Terraform Format
+          id: fmt
+          run: |
+            ls -la
+            terraform fmt -check -recursive -diff
+          working-directory: ${{ github.workspace	}}/.infra/terraform
 
         - name: Terraform Init
           id: init
           run: terraform init                    
-          working-directory: .infra/terraform
+          working-directory: ${{ github.workspace	}}/.infra/terraform
         
         # - name: Terraform Validate
         #   id: validate
