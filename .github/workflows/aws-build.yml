@@ -119,7 +119,7 @@ jobs:
           if [[ ${{github.event_name}} == 'pull_request' ]]; \
           then \
             BRANCH_NAME=${{ github.base_ref}} ; \
-            git branch -r --contains ${{github.sha}} | cut -d/ -f 2) ; \
+            git branch -r --contains ${{github.sha}} | cut -d/ -f 2 ; \
             echo ${{ github.ref_name }} ; \
             echo ${{ github.head_ref }} ; \
             echo ${{ github.base_ref }} ; \
@@ -127,7 +127,7 @@ jobs:
             echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV ; \
           else \
             BRANCH_NAME=$(git branch -r --contains ${{github.sha}} | cut -d/ -f 2) ; \
-            git branch -r --contains ${{github.sha}} | cut -d/ -f 2) ; \
+            git branch -r --contains ${{github.sha}} | cut -d/ -f 2 ; \
             echo ${{ github.ref_name }} ; \
             echo ${{ github.head_ref }} ; \
             echo ${{ github.base_ref }} ; \
