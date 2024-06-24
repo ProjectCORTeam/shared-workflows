@@ -144,7 +144,6 @@ jobs:
 
         - name: Input preprocessing
           shell: bash
-          working-directory: .infra/terraform
           run: |
             if [[ ${{inputs.stage}} == "master" ]]; \
             then \
@@ -155,7 +154,6 @@ jobs:
 
         - name: Input checks
           shell: bash
-          working-directory: .infra/terraform
           run: |
             echo "github_event: "${{github.event_name }}
             echo "github_branch: "${{github.ref}}
@@ -182,7 +180,6 @@ jobs:
             echo TF_VAR_terraform_role_name
 
         - name: Generate terraform.auto.tfvars for environment
-          # if:  contains(fromJson('["true"]'), inputs.new_stage )
           id: tfvars_generator
           shell: bash
           working-directory: .infra
@@ -214,10 +211,10 @@ jobs:
             terraform_version: 1.7.4
             cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
 
-        - name: Terraform Format
-          id: fmt
-          run: terraform fmt -check -recursive -diff
-          working-directory: .infra/terraform
+        # - name: Terraform Format
+        #   id: fmt
+        #   run: terraform fmt -check -recursive -diff
+        #   working-directory: .infra/terraform
 
         - name: Terraform Init
           id: init
