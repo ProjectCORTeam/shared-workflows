@@ -135,9 +135,12 @@ jobs:
           if [[ "${{ github.event_name }}" == 'pull_request' ]]; then
             BRANCH_NAME="${{ github.event.pull_request.base.ref }}"
             echo "BRANCH_NAME=${BRANCH_NAME}" >> $GITHUB_ENV
+          elif ${{ github.event.release.prerelease }}; then
+            echo "This is a pre-release."
+            echo "BRANCH_NAME=beta" >> $GITHUB_ENV
           else
-            BRANCH_NAME=$(git branch --contains ${{ github.sha }} | grep -v HEAD | sed -n 's|origin/||p' | head -n 1)
-            echo "BRANCH_NAME=${BRANCH_NAME}" >> $GITHUB_ENV
+            echo "This is a full release."
+            echo "BRANCH_NAME=master" >> $GITHUB_ENV
           fi
           echo "Extracted branch name: $BRANCH_NAME"
 
