@@ -187,6 +187,15 @@ jobs:
       codebuild_project: ${{ env.CODEBUILD_PROJECT }}
       
     steps:
+
+      - id: install-aws-cli
+        if: contains( inputs.runner, 'k8s-runners-stg' )
+        uses: unfor19/install-aws-cli-action@v1
+        with:
+          version: 2     # default
+          verbose: false # default
+          arch: amd64    # allowed values: amd64, arm64
+
       - name: Configure AWS Credentials - CICD
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -224,6 +233,14 @@ jobs:
     outputs:
       release_version: ${{ env.RELEASE_VERSION }}
     steps:
+
+      - id: install-aws-cli
+        if: contains( inputs.runner, 'k8s-runners-stg' )
+        uses: unfor19/install-aws-cli-action@v1
+        with:
+          version: 2     # default
+          verbose: false # default
+          arch: amd64    # allowed values: amd64, arm64
 
       - name: Set release version - Staging
         id: set-release-staging
