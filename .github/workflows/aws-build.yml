@@ -23,6 +23,11 @@ on:
           type: string
           default: master
           description: "Infra template version for get all configuration files"
+      branching_mode:
+        required: false
+        type: string
+        default: gitflow
+        description: "Repository branching strategy"
     outputs:
       new_stage:
         description: "New stage deployment check flag"
@@ -142,6 +147,7 @@ jobs:
 
       - name: Extract branch name
         id: extract_branch
+        if: contains( inputs.branching_mode, 'gitflow' )
         shell: bash
         run: |
           if [[ "${{ github.event_name }}" == 'pull_request' ]]; then
@@ -161,6 +167,7 @@ jobs:
     
       - name: Extract branch nam - Trunk Mode
         id: extract_branch_trunk
+        if: contains( inputs.branching_mode, 'trunk' )
         shell: bash
         run: |
           echo "BRANCH_NAME=$GITHUB_REF_NAME" 

@@ -41,6 +41,11 @@ on:
         type: string
         default: 1.7.4
         description: "Terraform version client"
+      branching_mode:
+        required: false
+        type: string
+        default: gitflow
+        description: "Repository branching strategy"
       only_plan:
           required: false
           type: boolean
