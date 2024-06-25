@@ -72,6 +72,10 @@ jobs:
           with:
               version: ${{ inputs.infra_terraform_version }}
 
+        - uses: actions/setup-node@v4
+          with:
+            node-version: 18
+
         - name: Setup Terraform
           shell: bash
           run: |
