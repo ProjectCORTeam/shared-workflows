@@ -10,7 +10,7 @@ on:
         type: string
         default: 'ubuntu-latest'
       env_check:
-        required: true
+        required: false
         type: string
         description: "Environment status checker"
       new_stage:
@@ -41,6 +41,11 @@ on:
         type: string
         default: 1.7.4
         description: "Terraform version client"
+      only_plan:
+          required: false
+          type: boolean
+          default: false
+          description: "Plan terraform changes flag"
     secrets: 
       CICD_AWS_ACCESS_KEY_ID:
         required: true
@@ -68,6 +73,7 @@ jobs:
             key: terraform-${{ inputs.stage }}
 
         - name: Install Terraform
+          if: contains( inputs.runner, 'k8s-runners-stg' )
           uses: little-core-labs/install-terraform@v2.0.0
           with:
               version: ${{ inputs.infra_terraform_version }}
@@ -158,13 +164,12 @@ jobs:
             echo "github_event: "${{github.event_name }}
             echo "github_branch: "${{github.ref}}
             echo "runner: "${{ inputs.runner }}
-            echo "env_check: "${{inputs.env_check}}
             echo "new_stage: "${{ inputs.new_stage }}
-            echo "stage: "${{env.STAGE}}
+            echo "stage: "${{inputs.stage}}
             echo "release_version: "${{inputs.release_version}}
 
         - name: Configure AWS Credentials - Terraform
-          uses: aws-actions/configure-aws-credentials@v2
+          uses: aws-actions/configure-aws-credentials@v4
           with:
             aws-access-key-id: ${{ secrets.TF_AWS_ACCESS_KEY_ID }}
             aws-secret-access-key: ${{ secrets.TF_AWS_SECRET_ACCESS_KEY }}
@@ -206,15 +211,14 @@ jobs:
             cat ./terraform/terraform.auto.tfvars.json
 
         - name: Setup Terraform
-          uses: hashicorp/setup-terraform@v2
+          uses: hashicorp/setup-terraform@v3.0.0
           with:
-            terraform_version: 1.7.4
+            terraform_version: ${{ inputs.infra_terraform_version }}
             cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
 
         - name: Terraform Format
           id: fmt
           run: |
-            ls -la
             terraform fmt -check -recursive -diff
           working-directory: ${{ github.workspace	}}/.infra/terraform
 
@@ -223,34 +227,34 @@ jobs:
           run: terraform init                    
           working-directory: ${{ github.workspace	}}/.infra/terraform
         
-        # - name: Terraform Validate
-        #   id: validate
-        #   run: terraform validate -no-color
-        #   working-directory: .infra/terraform
+        - name: Terraform Validate
+          id: validate
+          run: terraform validate -no-color
+          working-directory: .infra/terraform
 
         - name: Terraform Apply Staging
-          if: github.event_name == 'workflow_dispatch'
+          if: ${{ !contains(fromJSON('["production", "beta"]'), inputs.stage) }}
           id: infra-apply-staging
           run: |
             terraform apply -auto-approve -input=false \
             -target='module.shared' \
-            -target='module.staging["${{ env.STAGE }}"]' \
+            -target='module.staging["staging${{ inputs.stage }}"]' \
             -var="account_id_list=${{secrets.TF_VAR_ACCOUNT_ID_LIST}}" \
             -var="terraform_role_name=${{secrets.TF_VAR_TERRAFORM_ROLE_NAME}}" \
             -var="github_token=${{secrets.TF_VAR_GITHUB_TOKEN}}"
           working-directory: .infra/terraform
 
         - name: Google Chat Notification - Staging
-          if: github.event_name == 'workflow_dispatch'
+          if: ${{ !contains(fromJSON('["production", "beta"]'), inputs.stage) }}
           uses: nakamuraos/google-chat-notifications@v2.1.0
           with:
             title: Infrastructure Apply
-            subtitle: Staging - ${{ env.STAGE }}
+            subtitle: Staging - ${{ inputs.stage }}
             webhookUrl: ${{ secrets.GOOGLE_WEBHOOK }}
             status: ${{ steps.infra-apply-staging.outcome }}
 
         - name: Terraform Plan Beta
-          if: github.event_name == 'pull_request' && contains( github.base_ref, 'beta' )
+          if: contains( inputs.stage, 'beta' ) && inputs.only_plan
           id: plan-beta
           run: |
             terraform plan -no-color -input=false \
@@ -263,7 +267,7 @@ jobs:
           working-directory: .infra/terraform
         
         - name: Terraform Plan Prod
-          if: github.event_name == 'pull_request' && contains( github.base_ref, 'master' )
+          if: contains( inputs.stage, 'production' ) && inputs.only_plan
           id: plan-prod
           run: | 
             terraform plan -no-color -input=false \
@@ -284,7 +288,7 @@ jobs:
           run: exit 1
 
         - name: Terraform Apply Beta
-          if: github.event_name == 'release' && env.STAGE == 'beta'
+          if: inputs.stage == 'beta' && !inputs.only_plan
           id: infra-apply-beta
           run: |
             terraform apply -auto-approve -input=false \
@@ -292,11 +296,11 @@ jobs:
             -target='module.prod["beta"]' \
             -var="account_id_list=${{secrets.TF_VAR_ACCOUNT_ID_LIST}}" \
             -var="terraform_role_name=${{secrets.TF_VAR_TERRAFORM_ROLE_NAME}}" \
-            -var="github_token=${{secrets.TF_VAR_GITHUB_TOKEN}}"
+            -var="github_token=${{secrets.TF_VAR_GITHUB_TOKEN}}"        
           working-directory: .infra/terraform
 
         - name: Terraform Apply Prod
-          if: github.event_name == 'release' && env.STAGE == 'production'
+          if: inputs.stage == 'production' && !inputs.only_plan
           id: infra-apply-production
           run: | 
             terraform apply -auto-approve -input=false \
@@ -308,19 +312,19 @@ jobs:
           working-directory: .infra/terraform
 
         - name: Google Chat Notification - Beta
-          if: github.event_name == 'release' && env.STAGE == 'beta'
+          if: inputs.stage == 'beta'
           uses: nakamuraos/google-chat-notifications@v2.1.0
           with:
             title: Infrastructure Apply
-            subtitle: ${{ env.STAGE }}
+            subtitle: ${{ inputs.stage }}
             webhookUrl: ${{ secrets.GOOGLE_WEBHOOK }}
             status: ${{ steps.infra-apply-beta.outcome }}
 
         - name: Google Chat Notification - Production
-          if: github.event_name == 'release' && env.STAGE == 'production'
+          if: inputs.stage == 'production'
           uses: nakamuraos/google-chat-notifications@v2.1.0
           with:
             title: Infrastructure Apply
-            subtitle: ${{ env.STAGE }}
+            subtitle: ${{ inputs.stage }}
             webhookUrl: ${{ secrets.GOOGLE_WEBHOOK }}
             status: ${{ steps.infra-apply-production.outcome }}
