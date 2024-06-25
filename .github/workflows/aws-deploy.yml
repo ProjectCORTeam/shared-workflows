@@ -311,20 +311,20 @@ jobs:
             -var="github_token=${{secrets.TF_VAR_GITHUB_TOKEN}}"
           working-directory: .infra/terraform
 
-        - name: Google Chat Notification - Beta
-          if: inputs.stage == 'beta'
-          uses: nakamuraos/google-chat-notifications@v2.1.0
-          with:
-            title: Infrastructure Apply
-            subtitle: ${{ inputs.stage }}
-            webhookUrl: ${{ secrets.GOOGLE_WEBHOOK }}
-            status: ${{ steps.infra-apply-beta.outcome }}
+        # - name: Google Chat Notification - Beta
+        #   if: inputs.stage == 'beta'
+        #   uses: nakamuraos/google-chat-notifications@v2.1.0
+        #   with:
+        #     title: Infrastructure Apply
+        #     subtitle: ${{ inputs.stage }}
+        #     webhookUrl: ${{ secrets.GOOGLE_WEBHOOK }}
+        #     status: ${{ steps.infra-apply-beta.outcome }}
 
-        - name: Google Chat Notification - Production
-          if: inputs.stage == 'production'
-          uses: nakamuraos/google-chat-notifications@v2.1.0
-          with:
-            title: Infrastructure Apply
-            subtitle: ${{ inputs.stage }}
-            webhookUrl: ${{ secrets.GOOGLE_WEBHOOK }}
-            status: ${{ steps.infra-apply-production.outcome }}
+        # - name: Google Chat Notification - Production
+        #   if: inputs.stage == 'production'
+        #   uses: nakamuraos/google-chat-notifications@v2.1.0
+        #   with:
+        #     title: Infrastructure Apply
+        #     subtitle: ${{ inputs.stage }}
+        #     webhookUrl: ${{ secrets.GOOGLE_WEBHOOK }}
+        #     status: ${{ steps.infra-apply-production.outcome }}
