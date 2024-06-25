@@ -145,27 +145,7 @@ jobs:
             echo "STAGE_SHORT=$STAGE_INPUT" >> $GITHUB_OUTPUT
           fi
 
-      - name: Extract branch name
-        id: extract_branch
-        if: contains( inputs.branching_mode, 'gitflow' )
-        shell: bash
-        run: |
-          if [[ "${{ github.event_name }}" == 'pull_request' ]]; then
-            BRANCH_NAME="${{ github.event.pull_request.base.ref }}"
-            echo "Branch name extracted from pull request: $BRANCH_NAME"
-            echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
-          elif [[ "${{ github.event_name }}" == 'release' && ${{ github.event.release.prerelease }} == true ]]; then
-            echo "This is a pre-release."
-            BRANCH_NAME="beta"
-            echo "BRANCH_NAME=beta" >> $GITHUB_ENV
-          elif [[ "${{ github.event_name }}" == 'release' ]]; then
-            echo "This is a full release."
-            BRANCH_NAME="master"
-            echo "BRANCH_NAME=master" >> $GITHUB_ENV
-          fi
-          echo "Extracted branch name: $BRANCH_NAME"
-    
-      - name: Extract branch nam - Trunk Mode
+      - name: Extract branch name - Trunk Mode
         id: extract_branch_trunk
         if: contains( inputs.branching_mode, 'trunk' )
         shell: bash
