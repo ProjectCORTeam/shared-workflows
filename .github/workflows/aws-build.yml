@@ -123,10 +123,10 @@ jobs:
         shell: bash
         run: |
           if [[ "${{ github.event_name }}" == 'pull_request' ]]; then
-            BRANCH_NAME="${{ github.event.pull_request.base.ref }}"
+            BRANCH_NAME=${{github.base_ref}}
             echo "Branch name extracted from pull request: $BRANCH_NAME"
             echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
-          elif [[ "${{ github.event_name }}" == 'release' && ${{ github.event.release.prerelease }} == true ]]; then
+          elif [[ "${{ github.event_name }}" == 'release' && "${{ github.event.release.prerelease }}" == true ]]; then
             echo "This is a pre-release."
             BRANCH_NAME="beta"
             echo "BRANCH_NAME=beta" >> $GITHUB_ENV
