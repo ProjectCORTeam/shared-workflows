@@ -23,11 +23,17 @@ on:
           type: string
           default: master
           description: "Infra template version for get all configuration files"
+      force_build:
+        required: false
+        type: boolean
+        default: false
+        description: "Force a codebuild pipeline run"
       branching_mode:
         required: false
         type: string
         default: gitflow
         description: "Repository branching strategy"
+      
     outputs:
       new_stage:
         description: "New stage deployment check flag"
@@ -327,7 +333,7 @@ jobs:
 
       - name: Run AWS CodeBuild
         id: codebuild
-        if: ${{ steps.check-ecr.outputs.ECR_IMAGE_EXIST == 'false' }}
+        if: ${{ steps.check-ecr.outputs.ECR_IMAGE_EXIST == 'false' }} || ${{ inputs.force_build }}
         uses: dark-mechanicum/aws-codebuild@v1
         env:
           CODEBUILD__sourceVersion: ${{ env.CODEBUILD_SOURCE }}
