@@ -81,9 +81,10 @@ jobs:
         run: |
           echo "Checking job inputs...."
           echo "trigger_type: ${{inputs.trigger_type}}"
-          echo "stage: ${{inputs.stage}}"
+          echo "input stage: ${{inputs.stage}}"
           echo "runner: ${{inputs.runner}}"
           echo "notifications: ${{inputs.notifications}}"
+          echo "is prerelease: " ${{github.event.release.prerelease}}
 
       - name: Checkout
         uses: actions/checkout@v4
@@ -132,23 +133,49 @@ jobs:
         env:
           STAGE_INPUT: ${{ inputs.stage }}
         run: |
-          if [[ "$STAGE_INPUT" =~ ^staging([1-9]|10)?$ ]]; then
-            STAGE=${STAGE_INPUT/staging/}
-            echo "ENVIRONMENT=staging" >> $GITHUB_ENV
-            echo "ENVIRONMENT=staging" >> $GITHUB_OUTPUT
-            echo "STAGE=$STAGE_INPUT" >> $GITHUB_ENV
-            echo "STAGE=$STAGE_INPUT" >> $GITHUB_OUTPUT
-            echo "STAGE_SHORT=st$STAGE" >> $GITHUB_ENV
-            echo "STAGE_SHORT=st$STAGE" >> $GITHUB_OUTPUT
-            echo "Se está ejecutando como staging"
-          else
-            echo "Se está ejecutando como prod"
+          # if [[ "$STAGE_INPUT" =~ ^staging([1-9]|10)?$ ]]; then
+          #   STAGE=${STAGE_INPUT/staging/}
+          #   echo "ENVIRONMENT=staging" >> $GITHUB_ENV
+          #   echo "ENVIRONMENT=staging" >> $GITHUB_OUTPUT
+          #   echo "STAGE=$STAGE_INPUT" >> $GITHUB_ENV
+          #   echo "STAGE=$STAGE_INPUT" >> $GITHUB_OUTPUT
+          #   echo "STAGE_SHORT=st$STAGE" >> $GITHUB_ENV
+          #   echo "STAGE_SHORT=st$STAGE" >> $GITHUB_OUTPUT
+          #   echo "Se está ejecutando como staging"
+          # else
+          #   echo "Se está ejecutando como prod"
+          #   echo "ENVIRONMENT=prod" >> $GITHUB_ENV
+          #   echo "ENVIRONMENT=prod" >> $GITHUB_OUTPUT
+          #   echo "STAGE=$STAGE_INPUT" >> $GITHUB_ENV
+          #   echo "STAGE=$STAGE_INPUT" >> $GITHUB_OUTPUT
+          #   echo "STAGE_SHORT=$STAGE_INPUT" >> $GITHUB_ENV
+          #   echo "STAGE_SHORT=$STAGE_INPUT" >> $GITHUB_OUTPUT
+          # fi
+          if [[ -z "$STAGE_INPUT" ]]; then  # Check for empty STAGE_INPUT
+            echo "STAGE_INPUT is empty. Defaulting to prod."
             echo "ENVIRONMENT=prod" >> $GITHUB_ENV
-            echo "ENVIRONMENT=prod" >> $GITHUB_OUTPUT
-            echo "STAGE=$STAGE_INPUT" >> $GITHUB_ENV
-            echo "STAGE=$STAGE_INPUT" >> $GITHUB_OUTPUT
-            echo "STAGE_SHORT=$STAGE_INPUT" >> $GITHUB_ENV
-            echo "STAGE_SHORT=$STAGE_INPUT" >> $GITHUB_OUTPUT
+            if [[ "${{ github.event_name }}" == 'release' && "${{ github.event.release.prerelease }}" == true ]]; then
+              echo "This is a pre-release."
+              echo "STAGE=beta" >> $GITHUB_ENV
+              echo "STAGE_SHORT=$STAGE_INPUT" >> $GITHUB_ENV  # Keep STAGE_SHORT as is
+              elif [[ "${{ github.event_name }}" == 'release' ]]; then
+              echo "This is a full release."
+              echo "STAGE=master" >> $GITHUB_ENV
+              echo "STAGE_SHORT=$STAGE_INPUT" >> $GITHUB_ENV  # Keep STAGE_SHORT as is
+            fi
+          else
+            if [[ "$STAGE_INPUT" =~ ^staging([1-9]|10)?$ ]]; then
+              STAGE=${STAGE_INPUT/staging/}
+              echo "ENVIRONMENT=staging" >> $GITHUB_ENV
+              echo "STAGE=$STAGE_INPUT" >> $GITHUB_ENV
+              echo "STAGE_SHORT=st$STAGE" >> $GITHUB_ENV
+              echo "Se está ejecutando como staging"
+            else
+              echo "Invalid STAGE_INPUT format. Defaulting to prod."
+              echo "ENVIRONMENT=prod" >> $GITHUB_ENV
+              echo "STAGE=$STAGE_INPUT" >> $GITHUB_ENV
+              echo "STAGE_SHORT=$STAGE_INPUT" >> $GITHUB_ENV  # Keep STAGE_SHORT as is
+            fi
           fi
 
       - name: Extract branch name - Trunk Mode
