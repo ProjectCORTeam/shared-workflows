@@ -350,14 +350,14 @@ jobs:
           CODEBUILD=$(aws codebuild list-projects --region ${{ secrets.CICD_AWS_REGION }} --query 'projects[?ends_with(@,`${{ needs.sets-variables.outputs.PROJECT }}`) == `true`]' | jq ".[0]" | tr -d '"')
           echo "CODEBUILD_PROJECT_FINAL=$CODEBUILD" 
           echo "CODEBUILD_PROJECT_FINAL=$CODEBUILD" >> $GITHUB_ENV
-          echo contains(fromJson('["true"]'), steps.check-project.outputs.project_exist) && contains(fromJson('["push", "release", "workflow_dispatch"]'), github.event_name) && contains(fromJson('["failure"]'), steps.check-ecr-tag.outcome)
-          echo contains(fromJson('["true"]'), steps.check-project.outputs.project_exist)
-          echo contains(fromJson('["push", "release", "workflow_dispatch"]'), github.event_name)
-          echo contains(fromJson('["failure"]'), steps.check-ecr-tag.outcome)
+          echo ${{contains(fromJson('["true"]'), needs.codebuild-check.outputs.project_exist) && contains(fromJson('["push", "release", "workflow_dispatch"]'), github.event_name) && contains(fromJson('["failure"]'), steps.check-ecr-tag.outcome)}}
+          echo ${{contains(fromJson('["true"]'), needs.codebuild-check.outputs.project_exist)}}
+          echo ${{contains(fromJson('["push", "release", "workflow_dispatch"]'), github.event_name)}}
+          echo ${{contains(fromJson('["failure"]'), steps.check-ecr-tag.outcome)}}
 
       - name: Run AWS CodeBuild
         id: codebuild
-        if: true #contains(fromJson('["true"]'), steps.check-project.outputs.project_exist) && contains(fromJson('["push", "release", "workflow_dispatch"]'), github.event_name) && contains(fromJson('["failure"]'), steps.check-ecr-tag.outcome)
+        if: true #contains(fromJson('["true"]'), needs.codebuild-check.outputs.project_exist) && contains(fromJson('["push", "release", "workflow_dispatch"]'), github.event_name) && contains(fromJson('["failure"]'), steps.check-ecr-tag.outcome)
         uses: dark-mechanicum/aws-codebuild@v1
         env:
           CODEBUILD__sourceVersion: ${{ env.CODEBUILD_SOURCE }}
@@ -372,7 +372,7 @@ jobs:
             }'
 
       - name: Google Chat Notification - Without codebuild
-        if: contains(fromJson('["true"]'), steps.check-project.outputs.project_exist ) && contains(fromJson('["push", "release", "workflow_dispatch"]'), github.event_name) && contains(fromJson('["success"]'), steps.check-ecr-tag.outcome)
+        if: contains(fromJson('["true"]'), needs.codebuild-check.outputs.project_exist ) && contains(fromJson('["push", "release", "workflow_dispatch"]'), github.event_name) && contains(fromJson('["success"]'), steps.check-ecr-tag.outcome)
         uses: nakamuraos/google-chat-notifications@v2.1.0
         with:
           title: Image Build
@@ -383,8 +383,8 @@ jobs:
       - name: Output checks
         shell: bash
         run: |
-          echo "new_stage: " ${{ steps.check-project.outputs.new_stage }}
-          echo "stage_check: " ${{ steps.check-project.outputs.project_exist }}
+          echo "new_stage: " ${{ needs.codebuild-check.outputs.project_exist }}
+          echo "stage_check: " ${{ needs.codebuild-check.outputs.project_exist }}
           echo "stage: " ${{ steps.set_project_name.outputs.stage }}
           echo "env_check: " ${{ steps.set_project_name.outcome }}
           echo "release_version: " ${{ env.RELEASE_VERSION}}
