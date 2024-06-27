@@ -161,16 +161,6 @@ jobs:
             find ./ -type f -exec sed -i "s/\$TEMPLATE_SERVICE_NAME/$SERVICE_NAME/g" {} +
             find ./ -type f -exec sed -i "s/\$TEMPLATE_SERVICE_OWNER_TEAM/$SERVICE_OWNER/g" {} +
 
-        - name: Input preprocessing
-          shell: bash
-          run: |
-            if [[ ${{inputs.stage}} == "master" ]]; \
-            then \
-            echo "STAGE=production" >> $GITHUB_ENV; \
-            else \
-            echo "STAGE=${{inputs.stage}}" >> $GITHUB_ENV ; \
-            fi
-
         - name: Input checks
           shell: bash
           run: |
