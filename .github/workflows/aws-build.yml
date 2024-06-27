@@ -19,10 +19,10 @@ on:
         default: true
         description: "Enable notifications to cloud or team owner flag"
       infra_templates_version:
-          required: false
-          type: string
-          default: master
-          description: "Infra template version for get all configuration files"
+        required: false
+        type: string
+        default: master
+        description: "Infra template version for get all configuration files"
       force_build:
         required: false
         type: boolean
@@ -33,7 +33,7 @@ on:
         type: string
         default: gitflow
         description: "Repository branching strategy"
-      
+
     outputs:
       new_stage:
         description: "New stage deployment check flag"
@@ -159,6 +159,26 @@ jobs:
           echo "BRANCH_NAME=$GITHUB_REF_NAME" 
           echo "BRANCH_NAME=$GITHUB_REF_NAME" >> $GITHUB_ENV 
           echo "BRANCH_NAME=$GITHUB_REF_NAME" >> $GITHUB_OUTPUT 
+
+      - name: Extract branch name - Gitflow Mode
+        id: extract_branch
+        if: contains(fromJson('["push", "release", "pull_request"]'), github.event_name)
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == 'pull_request' ]]; then
+            BRANCH_NAME=${{github.base_ref}}
+            echo "Branch name extracted from pull request: $BRANCH_NAME"
+            echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
+          elif [[ "${{ github.event_name }}" == 'release' && "${{ github.event.release.prerelease }}" == true ]]; then
+            echo "This is a pre-release."
+            BRANCH_NAME="beta"
+            echo "BRANCH_NAME=beta" >> $GITHUB_ENV
+          elif [[ "${{ github.event_name }}" == 'release' ]]; then
+            echo "This is a full release."
+            BRANCH_NAME="master"
+            echo "BRANCH_NAME=master" >> $GITHUB_ENV
+          fi
+          echo "Extracted branch name: $BRANCH_NAME"
 
       - name: Set release/branch version - staging
         id: set-release-staging
@@ -333,7 +353,7 @@ jobs:
 
       - name: Run AWS CodeBuild
         id: codebuild
-        if: ${{ steps.check-ecr.outputs.ECR_IMAGE_EXIST == 'false' }} || ${{ inputs.force_build }}
+        if: contains(fromJson('["true"]'), steps.check-project.outputs.project_exist) && contains(fromJson('["push", "release", "workflow_dispatch"]'), github.event_name) && contains(fromJson('["failure"]'), steps.check-ecr-tag.outcome) || inputs.force_build
         uses: dark-mechanicum/aws-codebuild@v1
         env:
           CODEBUILD__sourceVersion: ${{ env.CODEBUILD_SOURCE }}
