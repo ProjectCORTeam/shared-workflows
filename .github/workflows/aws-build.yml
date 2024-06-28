@@ -124,6 +124,8 @@ jobs:
               echo "RELEASE_TAG=$tag"
               echo "RELEASE_TAG=$tag" >> $GITHUB_ENV
               echo "RELEASE_TAG=$tag" >> $GITHUB_OUTPUT
+              echo "RELEASE_VERSION=$tag" >> $GITHUB_ENV
+              echo "RELEASE_VERSION=$tag" >> $GITHUB_OUTPUT
           else
               echo "Current commit does not have a tag"
           fi
