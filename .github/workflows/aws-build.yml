@@ -146,8 +146,8 @@ jobs:
               echo "STAGE_SHORT=$STAGE_INPUT" >> $GITHUB_OUTPUT  # Keep STAGE_SHORT as is
               elif [[ "${{ github.event_name }}" == 'release' ]]; then
               echo "This is a full release."
-              echo "STAGE=master" >> $GITHUB_ENV
-              echo "STAGE=master" >> $GITHUB_OUTPUT
+              echo "STAGE=production" >> $GITHUB_ENV
+              echo "STAGE=production" >> $GITHUB_OUTPUT
               echo "STAGE_SHORT=$STAGE_INPUT" >> $GITHUB_ENV  # Keep STAGE_SHORT as is
               echo "STAGE_SHORT=$STAGE_INPUT" >> $GITHUB_OUTPUT  # Keep STAGE_SHORT as is
             fi
