@@ -211,7 +211,7 @@ jobs:
         id: set-release-staging
         if: contains(fromJson('["workflow_dispatch"]'), inputs.trigger_type)
         run: |
-          RELEASE_VERSION=${{ inputs.staging_target }}
+          RELEASE_VERSION=${{ inputs.stage }}
           RELEASE_VERSION=$(echo $RELEASE_VERSION | sed s/staging/v/g)
           RELEASE_VERSION=$RELEASE_VERSION".0.0-staging-"${{ env.SHORT_COMMIT_HASH}}
           echo "Final staging release version: "$RELEASE_VERSION
@@ -370,7 +370,7 @@ jobs:
           echo "CODEBUILD_SOURCE=$CODEBUILD_SOURCE" >> $GITHUB_OUTPUT
 
       - name: Get Codebuild Project Name
-        id: get-project-name
+        id: get_project_name
         if: needs.codebuild-check.outputs.project_exist
         shell: bash
         run: |
@@ -408,6 +408,6 @@ jobs:
         run: |
           echo "new_stage: " ${{ needs.codebuild-check.outputs.project_exist }}
           echo "stage_check: " ${{ needs.codebuild-check.outputs.project_exist }}
-          echo "stage: " ${{ steps.set_project_name.outputs.stage }}
-          echo "env_check: " ${{ steps.set_project_name.outcome }}
+          echo "stage: " ${{ env.stage }}
+          echo "env_check: " ${{ steps.get_project_name.outcome }}
           echo "release_version: " ${{ env.RELEASE_VERSION}}
