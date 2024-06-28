@@ -82,10 +82,6 @@ jobs:
           uses: little-core-labs/install-terraform@v2.0.0
           with:
               version: ${{ inputs.infra_terraform_version }}
-        
-        - uses: actions/setup-node@v4
-          with:
-            node-version: 18
 
         - uses: actions/setup-node@v4
           with:
@@ -101,16 +97,6 @@ jobs:
             EOL
             #echo "TF_PLUGIN_CACHE_DIR=$HOME/.terraform.d/plugin-cache" >>"$GITHUB_ENV"
             #mkdir --parents "$HOME/.terraform.d/plugin-cache"
-
-        - name: Cache Terraform
-          uses: actions/cache@v4
-          if: false
-          with:
-            path: |
-              ~/.terraform.d/plugin-cache
-            key: terraform-${{ runner.os }}-${{ hashFiles('**/.terraform.lock.hcl') }}
-            restore-keys: |
-              terraform-${{ runner.os }}-
 
         - name: Import Templates
           uses: actions/checkout@v4
@@ -192,17 +178,17 @@ jobs:
           shell: bash
           working-directory: .infra
           run: |
-            if [ ${{env.STAGE}} == 'production' ] || [ ${{env.STAGE}} == 'beta' ]; then \
-              #jq --argjson new_env '{"new_env": ${{ inputs.new_stage }}' --arg commit_id "${GITHUB_SHA::7}" --arg version ${{inputs.release_version}} '.commit_id += $commit_id | (.env_settings[]) += {new_env: false} | .env_settings |= map(if .stage == "${{env.STAGE}}" then . += $new_env + {release_version: $version} else . end)' infra-config.json > ./terraform/terraform.auto.tfvars.json              
+            if [ ${{inputs.STAGE}} == 'production' ] || [ ${{inputs.STAGE}} == 'beta' ]; then \
+              #jq --argjson new_env '{"new_env": ${{ inputs.new_stage }}' --arg commit_id "${GITHUB_SHA::7}" --arg version ${{inputs.release_version}} '.commit_id += $commit_id | (.env_settings[]) += {new_env: false} | .env_settings |= map(if .stage == "${{inputs.STAGE}}" then . += $new_env + {release_version: $version} else . end)' infra-config.json > ./terraform/terraform.auto.tfvars.json              
               jq --arg new_env "${{ inputs.new_stage }}" \
                   --arg commit_id "${GITHUB_SHA::7}" \
                   --arg version "${{ inputs.release_version }}" \
                   '.commit_id += $commit_id | 
                     .env_settings[] += {"new_env": false} | 
-                    .env_settings |= map(if .stage == "${{ env.STAGE }}" then . += {"new_env": $new_env, "release_version": $version} else . end)' \
+                    .env_settings |= map(if .stage == "${{inputs.STAGE}}" then . += {"new_env": $new_env, "release_version": $version} else . end)' \
                   infra-config.json > ./terraform/terraform.auto.tfvars.json
             else \
-              #jq --argjson new_env '{"new_env": ${{ inputs.new_stage }}' --arg commit_id "$(git rev-parse --short HEAD)" '.commit_id += $commit_id | (.env_settings[]) += {new_env: false} | .env_settings |= map(if .stage == "${{env.STAGE}}" then . += $new_env else . end)' infra-config.json > ./terraform/terraform.auto.tfvars.json
+              #jq --argjson new_env '{"new_env": ${{ inputs.new_stage }}' --arg commit_id "$(git rev-parse --short HEAD)" '.commit_id += $commit_id | (.env_settings[]) += {new_env: false} | .env_settings |= map(if .stage == "${{inputs.STAGE}}" then . += $new_env else . end)' infra-config.json > ./terraform/terraform.auto.tfvars.json
               jq --arg new_env "${{ inputs.new_stage }}" \
                 --arg commit_id "${GITHUB_SHA::7}" \
                 '.commit_id = $commit_id | 
