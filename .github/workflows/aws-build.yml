@@ -115,7 +115,7 @@ jobs:
       - name: Sync infra config 
         id: sync-infra-config
         run: |
-          aws s3 cp s3://cor-infra-us-east-2-services-configs/${{ github.repository }} .infra/infra-config.json
+          aws s3 cp s3://cor-infra-us-east-2-services-configs/${{ github.repository }}.json .infra/infra-config.json
   
       - name: Get Commit Hash
         id: get-commit-ids
