@@ -116,6 +116,7 @@ jobs:
             sparse-checkout: |
               .infra/
             fetch-depth: 1
+
         - name: Configure AWS Credentials - INFRA
           uses: aws-actions/configure-aws-credentials@v1
           with:
