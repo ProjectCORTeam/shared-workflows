@@ -77,6 +77,14 @@ jobs:
               .infra/terraform/.terraform
             key: terraform-${{ inputs.stage }}
 
+        - id: install-aws-cli
+          if: contains( inputs.runner, 'k8s-runners-stg' )
+          uses: unfor19/install-aws-cli-action@v1
+          with:
+            version: 2     # default
+            verbose: false # default
+            arch: amd64    # allowed values: amd64, arm64
+
         - name: Install Terraform
           if: contains( inputs.runner, 'k8s-runners-stg' )
           uses: little-core-labs/install-terraform@v2.0.0
