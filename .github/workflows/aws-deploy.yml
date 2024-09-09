@@ -116,6 +116,17 @@ jobs:
             sparse-checkout: |
               .infra/
             fetch-depth: 1
+        - name: Configure AWS Credentials - INFRA
+          uses: aws-actions/configure-aws-credentials@v1
+          with:
+            aws-access-key-id: ${{ secrets.INFRA_AWS_ACCESS_KEY_ID }}
+            aws-secret-access-key: ${{ secrets.INFRA_AWS_SECRET_ACCESS_KEY }}
+            aws-region: ${{ secrets.INFRA_AWS_REGION }}
+    
+        - name: Sync infra config 
+          id: sync-infra-config
+          run: |
+            aws s3 cp s3://cor-infra-us-east-2-services-configs/${{ github.repository }} ./infra-config/.infra/infra-config.json
 
         - name: Setup Infra service files
           shell: bash
