@@ -57,6 +57,12 @@ on:
         required: true
       CICD_AWS_REGION:
         required: true
+      INFRA_AWS_ACCESS_KEY_ID:
+        required: true
+      INFRA_AWS_SECRET_ACCESS_KEY:
+        required: true
+      INFRA_AWS_REGION:
+        required: true
       GOOGLE_WEBHOOK:
         required: true
 
@@ -97,8 +103,20 @@ jobs:
         with:
           version: 2     # default
           verbose: false # default
-          arch: amd64    # allowed values: amd64, arm64
+          arch: amd64    # allowed values: amd64, 
+          
+      - name: Configure AWS Credentials - INFRA
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.INFRA_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.INFRA_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.INFRA_AWS_REGION }}
 
+      - name: Sync infra config 
+        id: sync-infra-config
+        run: |
+          aws s3 cp s3://cor-infra-us-east-2-services-configs/${{ github.repository }}.json .infra/infra-config.json
+  
       - name: Get Commit Hash
         id: get-commit-ids
         run: |
