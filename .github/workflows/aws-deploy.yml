@@ -84,14 +84,14 @@ jobs:
 
       - name: Configure AWS Credentials - STG
         uses: aws-actions/configure-aws-credentials@v4
-        if: ${{ contains(fromJSON('["staging"]'), inputs.stage) }}
+        if: ${{ contains(inputs.stage, 'staging') }}
         with:
-          aws-access-key-id: ${{ secrets.TF_AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.TF_AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.TF_AWS_REGION }}
+          aws-access-key-id: ${{ secrets.STG_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.STG_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.STG_AWS_REGION }}
 
       - name: Authenticate with EKS - Staging
-        if: ${{ contains(fromJSON('["staging"]'), inputs.stage) }}
+        if: ${{ contains(inputs.stage, 'staging') }}
         run: |
           aws eks update-kubeconfig --name cor-staging-us-east-1-main --region us-east-1
         env:
@@ -116,8 +116,8 @@ jobs:
         env:
           STAGE_INPUT: ${{ inputs.stage }}
         run: |
-          SERVICE_NAME=$(jq -r '.name' ./infra-config.json)  
-          INFRA_TYPE=$(jq -r '.deployment_type' ./infra-config.json | tr '[:upper:]' '[:lower:]')
+          SERVICE_NAME=$(jq -r '.name' infra-config/.infra/infra-config.json)  
+          INFRA_TYPE=$(jq -r '.deployment_type' infra-config/.infra/infra-config.json | tr '[:upper:]' '[:lower:]')
           
           if [[ "$STAGE_INPUT" =~ ^staging([1-9]|10)$ ]]; then
             K8S_NAMESPACE="${STAGE_INPUT/staging/staging-}"
