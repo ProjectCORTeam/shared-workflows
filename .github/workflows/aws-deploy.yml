@@ -135,7 +135,7 @@ jobs:
 
           # Ejecutar el upgrade/install de Helm
           helm upgrade --install ${{ inputs.release_version }} cor/$SERVICE_TYPE-$SERVICE_NAME \
-            --namespace $K8S_NAMESPACE
+            --namespace $K8S_NAMESPACE --atomic
   terraform:
       name: "Terraform"
       runs-on: ${{ inputs.runner }}
