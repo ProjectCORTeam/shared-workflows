@@ -94,8 +94,8 @@ jobs:
         if: ${{ contains(inputs.stage, 'staging') }}
         run: |
           aws eks update-kubeconfig --name cor-staging-us-east-1-main --region us-east-1
-        # env:
-        #   KUBECONFIG: /root/.kube/config
+        env:
+          KUBECONFIG: /home/runner/.kube/config
 
       - name: Configure AWS Credentials - PROD
         uses: aws-actions/configure-aws-credentials@v4
@@ -110,11 +110,12 @@ jobs:
         run: |
           sudo aws eks update-kubeconfig --name cor-prod-us-east-2-all --region us-east-2
         env:
-          KUBECONFIG: /root/.kube/config
+          KUBECONFIG: /home/runner/.kube/config
 
       - name: Install or Upgrade Helm Chart
         env:
           STAGE_INPUT: ${{ inputs.stage }}
+          KUBECONFIG: /home/runner/.kube/config
         run: |
           SERVICE_NAME=$(jq -r '.name' infra-config/.infra/infra-config.json)  
           INFRA_TYPE=$(jq -r '.deployment_type' infra-config/.infra/infra-config.json | tr '[:upper:]' '[:lower:]')
