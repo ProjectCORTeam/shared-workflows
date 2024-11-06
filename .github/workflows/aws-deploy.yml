@@ -119,7 +119,7 @@ jobs:
           KUBECONFIG: /home/runner/.kube/config
         run: |
           SERVICE_NAME=$(jq -r '.name' infra-config/.infra/infra-config.json)  
-          INFRA_TYPE=$(jq -r '.deployment_type' infra-config/.infra/infra-config.json | tr '[:upper:]' '[:lower:]')
+          SERVICE_TYPE=$(jq -r '.type' infra-config/.infra/infra-config.json | tr '[:upper:]' '[:lower:]')
           
           # Configurar el nombre del namespace
           if [[ "$STAGE_INPUT" =~ ^staging([1-9]|10)$ ]]; then
@@ -129,14 +129,12 @@ jobs:
           fi
           echo "Kubernetes namespace is: $K8S_NAMESPACE"
 
-          kubectl get nodes
-          
           # Añadir el repositorio de Helm
           helm repo add cor https://chartmuseum.shared.projectcor.com
           helm repo update
 
           # Ejecutar el upgrade/install de Helm
-          helm upgrade --install ${{ inputs.release_version }} cor/$SERVICE_NAME-$INFRA_TYPE \
+          helm upgrade --install ${{ inputs.release_version }} cor/$SERVICE_TYPE-$SERVICE_NAME \
             --namespace $K8S_NAMESPACE
   terraform:
       name: "Terraform"
