@@ -93,9 +93,9 @@ jobs:
       - name: Authenticate with EKS - Staging
         if: ${{ contains(inputs.stage, 'staging') }}
         run: |
-          aws eks update-kubeconfig --name cor-staging-us-east-1-main --region us-east-1
-        # env:
-        #   KUBECONFIG: /root/.kube/config
+          sudo aws eks update-kubeconfig --name cor-staging-us-east-1-main --region us-east-1
+        env:
+          KUBECONFIG: /root/.kube/config
 
       - name: Configure AWS Credentials - PROD
         uses: aws-actions/configure-aws-credentials@v4
@@ -108,7 +108,7 @@ jobs:
       - name: Authenticate with EKS - Prod
         if: ${{ contains(fromJSON('["production", "beta"]'), inputs.stage) }}
         run: |
-          aws eks update-kubeconfig --name cor-prod-us-east-2-all --region us-east-2
+          sudo aws eks update-kubeconfig --name cor-prod-us-east-2-all --region us-east-2
         env:
           KUBECONFIG: /root/.kube/config
 
