@@ -66,9 +66,58 @@ on:
         required: true
 
 jobs:
+  helm:
+    name: Helm
+    runs-on: ubuntu-latest
+    steps: 
+      - name: Sync infra config 
+        id: sync-infra-config
+        run: |
+          aws s3 cp s3://cor-infra-us-east-2-services-configs/${{ github.repository }}.json ./infra-config/.infra/infra-config.json
+
+      - name: Configure AWS Credentials - Terraform
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.TF_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.TF_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.TF_AWS_REGION }}
+
+      - name: Authenticate with EKS - Staging
+        if: ${{ contains(fromJSON('["staging"]'), inputs.stage) }}
+        run: |
+          aws eks update-kubeconfig --name cor-staging-us-east-1-main --region us-east-1
+        env:
+          KUBECONFIG: /root/.kube/config
+
+      - name: Authenticate with EKS - Prod
+        if: ${{ contains(fromJSON('["production", "beta"]'), inputs.stage) }}
+        run: |
+          aws eks update-kubeconfig --name cor-prod-us-east-2-all --region us-east-2
+        env:
+          KUBECONFIG: /root/.kube/config
+
+      - name: Install or Upgrade Helm Chart
+        env:
+          STAGE_INPUT: ${{ inputs.stage }}
+        run: |
+          SERVICE_NAME=$(jq -r '.name' ./infra-config.json)  
+          INFRA_TYPE=$(jq -r '.deployment_type' ./infra-config.json | tr '[:upper:]' '[:lower:]')
+          
+          if [[ "$STAGE_INPUT" =~ ^staging([1-9]|10)$ ]]; then
+            K8S_NAMESPACE="${STAGE_INPUT/staging/staging-}"
+          else
+            K8S_NAMESPACE="$STAGE_INPUT"
+          fi
+          echo "Kubernetes namespace is: $K8S_NAMESPACE"
+          helm repo add cor https://chartmuseum.shared.projectcor.com
+          helm repo update
+          helm upgrade --install ${{ inputs.release_version }} cor/$SERVICE_NAME-$INFRA_TYPE \
+            --namespace $K8S_NAMESPACE
+
   terraform:
       name: "Terraform"
       runs-on: ${{ inputs.runner }}
+      if: false
       steps:
         - name: Cache Terraform files
           uses: actions/cache@v4
