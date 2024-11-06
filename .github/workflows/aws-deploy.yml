@@ -134,7 +134,9 @@ jobs:
           helm repo update
 
           # Ejecutar el upgrade/install de Helm
-          helm upgrade --install $SERVICE_TYPE-$SERVICE_NAME-${{ inputs.release_version }} cor/$SERVICE_TYPE-$SERVICE_NAME \
+          helm upgrade --install $SERVICE_TYPE-$SERVICE_NAME-$K8S_NAMESPACE \
+            cor/$SERVICE_TYPE-$SERVICE_NAME \
+            --version ${{ inputs.release_version }} \
             --namespace $K8S_NAMESPACE --atomic --reuse-values --timeout 5m
   terraform:
       name: "Terraform"
