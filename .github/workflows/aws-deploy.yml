@@ -70,13 +70,21 @@ jobs:
     name: Helm
     runs-on: ubuntu-latest
     steps: 
+      - name: Configure AWS Credentials - INFRA
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.INFRA_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.INFRA_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.INFRA_AWS_REGION }}
+
       - name: Sync infra config 
         id: sync-infra-config
         run: |
           aws s3 cp s3://cor-infra-us-east-2-services-configs/${{ github.repository }}.json ./infra-config/.infra/infra-config.json
 
-      - name: Configure AWS Credentials - Terraform
+      - name: Configure AWS Credentials - STG
         uses: aws-actions/configure-aws-credentials@v4
+        if: ${{ contains(fromJSON('["staging"]'), inputs.stage) }}
         with:
           aws-access-key-id: ${{ secrets.TF_AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.TF_AWS_SECRET_ACCESS_KEY }}
@@ -88,6 +96,14 @@ jobs:
           aws eks update-kubeconfig --name cor-staging-us-east-1-main --region us-east-1
         env:
           KUBECONFIG: /root/.kube/config
+
+      - name: Configure AWS Credentials - PROD
+        uses: aws-actions/configure-aws-credentials@
+        if: ${{ contains(fromJSON('["production", "beta"]'), inputs.stage) }}
+        with:
+          aws-access-key-id: ${{ secrets.PROD_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.PROD_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.PROD_AWS_REGION }}
 
       - name: Authenticate with EKS - Prod
         if: ${{ contains(fromJSON('["production", "beta"]'), inputs.stage) }}
