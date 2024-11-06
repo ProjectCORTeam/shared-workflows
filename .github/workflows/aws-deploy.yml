@@ -98,7 +98,7 @@ jobs:
           KUBECONFIG: /root/.kube/config
 
       - name: Configure AWS Credentials - PROD
-        uses: aws-actions/configure-aws-credentials@
+        uses: aws-actions/configure-aws-credentials@v4
         if: ${{ contains(fromJSON('["production", "beta"]'), inputs.stage) }}
         with:
           aws-access-key-id: ${{ secrets.PROD_AWS_ACCESS_KEY_ID }}
