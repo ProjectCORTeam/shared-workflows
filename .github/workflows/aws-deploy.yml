@@ -80,11 +80,12 @@ jobs:
       - name: Sync infra config 
         id: sync-infra-config
         run: |
+          mkdir -p infra-config/.infra
           aws s3 cp s3://cor-infra-us-east-2-services-configs/${{ github.repository }}.json ./infra-config/.infra/infra-config.json
 
       - name: Configure AWS Credentials - STG
-        uses: aws-actions/configure-aws-credentials@v4
         if: ${{ contains(inputs.stage, 'staging') }}
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.STG_AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.STG_AWS_SECRET_ACCESS_KEY }}
@@ -98,8 +99,8 @@ jobs:
           KUBECONFIG: /home/runner/.kube/config
 
       - name: Configure AWS Credentials - PROD
-        uses: aws-actions/configure-aws-credentials@v4
         if: ${{ contains(fromJSON('["production", "beta"]'), inputs.stage) }}
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.PROD_AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.PROD_AWS_SECRET_ACCESS_KEY }}
@@ -108,7 +109,7 @@ jobs:
       - name: Authenticate with EKS - Prod
         if: ${{ contains(fromJSON('["production", "beta"]'), inputs.stage) }}
         run: |
-          sudo aws eks update-kubeconfig --name cor-prod-us-east-2-all --region us-east-2
+          aws eks update-kubeconfig --name cor-prod-us-east-2-all --region us-east-2
         env:
           KUBECONFIG: /home/runner/.kube/config
 
@@ -120,17 +121,23 @@ jobs:
           SERVICE_NAME=$(jq -r '.name' infra-config/.infra/infra-config.json)  
           INFRA_TYPE=$(jq -r '.deployment_type' infra-config/.infra/infra-config.json | tr '[:upper:]' '[:lower:]')
           
+          # Configurar el nombre del namespace
           if [[ "$STAGE_INPUT" =~ ^staging([1-9]|10)$ ]]; then
             K8S_NAMESPACE="${STAGE_INPUT/staging/staging-}"
           else
             K8S_NAMESPACE="$STAGE_INPUT"
           fi
           echo "Kubernetes namespace is: $K8S_NAMESPACE"
+
+          kubectl get nodes
+          
+          # Añadir el repositorio de Helm
           helm repo add cor https://chartmuseum.shared.projectcor.com
           helm repo update
+
+          # Ejecutar el upgrade/install de Helm
           helm upgrade --install ${{ inputs.release_version }} cor/$SERVICE_NAME-$INFRA_TYPE \
             --namespace $K8S_NAMESPACE
-
   terraform:
       name: "Terraform"
       runs-on: ${{ inputs.runner }}
