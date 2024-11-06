@@ -66,9 +66,82 @@ on:
         required: true
 
 jobs:
+  helm:
+    name: Helm
+    runs-on: ubuntu-latest
+    steps: 
+      - name: Configure AWS Credentials - INFRA
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.INFRA_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.INFRA_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.INFRA_AWS_REGION }}
+
+      - name: Sync infra config 
+        id: sync-infra-config
+        run: |
+          mkdir -p infra-config/.infra
+          aws s3 cp s3://cor-infra-us-east-2-services-configs/${{ github.repository }}.json ./infra-config/.infra/infra-config.json
+
+      - name: Configure AWS Credentials - STG
+        if: ${{ contains(inputs.stage, 'staging') }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.STG_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.STG_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.STG_AWS_REGION }}
+
+      - name: Authenticate with EKS - Staging
+        if: ${{ contains(inputs.stage, 'staging') }}
+        run: |
+          aws eks update-kubeconfig --name cor-staging-us-east-1-main --region us-east-1
+        env:
+          KUBECONFIG: /home/runner/.kube/config
+
+      - name: Configure AWS Credentials - PROD
+        if: ${{ contains(fromJSON('["production", "beta"]'), inputs.stage) }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.PROD_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.PROD_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.PROD_AWS_REGION }}
+
+      - name: Authenticate with EKS - Prod
+        if: ${{ contains(fromJSON('["production", "beta"]'), inputs.stage) }}
+        run: |
+          aws eks update-kubeconfig --name cor-prod-us-east-2-all --region us-east-2
+        env:
+          KUBECONFIG: /home/runner/.kube/config
+
+      - name: Install or Upgrade Helm Chart
+        env:
+          STAGE_INPUT: ${{ inputs.stage }}
+          KUBECONFIG: /home/runner/.kube/config
+        run: |
+          SERVICE_NAME=$(jq -r '.name' infra-config/.infra/infra-config.json)  
+          SERVICE_TYPE=$(jq -r '.type' infra-config/.infra/infra-config.json | tr '[:upper:]' '[:lower:]')
+          
+          # Configurar el nombre del namespace
+          if [[ "$STAGE_INPUT" =~ ^staging([1-9]|10)$ ]]; then
+            K8S_NAMESPACE="${STAGE_INPUT/staging/staging-}"
+          else
+            K8S_NAMESPACE="$STAGE_INPUT"
+          fi
+          echo "Kubernetes namespace is: $K8S_NAMESPACE"
+
+          # Añadir el repositorio de Helm
+          helm repo add cor https://chartmuseum.shared.projectcor.com
+          helm repo update
+
+          # Ejecutar el upgrade/install de Helm
+          helm upgrade --install $SERVICE_TYPE-$SERVICE_NAME-$K8S_NAMESPACE \
+            cor/$SERVICE_TYPE-$SERVICE_NAME \
+            --version ${{ inputs.release_version }} \
+            --namespace $K8S_NAMESPACE --atomic --reuse-values --timeout 5m
   terraform:
       name: "Terraform"
       runs-on: ${{ inputs.runner }}
+      if: false
       steps:
         - name: Cache Terraform files
           uses: actions/cache@v4
