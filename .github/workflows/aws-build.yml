@@ -390,7 +390,7 @@ jobs:
 
       - name: Run AWS CodeBuild
         id: codebuild
-        if: contains(fromJson('["true"]'), needs.codebuild-check.outputs.project_exist) && contains(fromJson('["push", "release", "workflow_dispatch"]'), github.event_name) && contains(fromJson('["failure"]'), steps.check-ecr-tag.outcome)
+        if: inputs.force_build || (contains(fromJson('["true"]'), needs.codebuild-check.outputs.project_exist) && contains(fromJson('["push", "release", "workflow_dispatch"]'), github.event_name) && contains(fromJson('["failure"]'), steps.check-ecr-tag.outcome))
         uses: dark-mechanicum/aws-codebuild@v1
         env:
           CODEBUILD__sourceVersion: ${{ env.CODEBUILD_SOURCE }}
