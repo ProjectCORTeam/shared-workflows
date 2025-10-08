@@ -37,19 +37,20 @@ on:
     outputs:
       new_stage:
         description: "New stage deployment check flag"
-        value: ${{ jobs.codebuild-check.outputs.new_stage }}
+        value: ${{ jobs.check-stage.outputs.new_stage }}
       env_check:
         description: "Environment status checker"
-        value: ${{ jobs.aws-build.outputs.env_check }}
+        value: ${{ jobs.docker-build-push.outputs.env_check }}
       stage_check:
         description: "Stage status checker"
-        value: ${{ jobs.codebuild-check.outputs.project_exist }}
+        value: ${{ jobs.check-stage.outputs.stage_check }}
       stage:
         description: "Stage name for infrastructure deployment"
         value: ${{ jobs.sets-variables.outputs.STAGE }}
       release_version:
         description: "Semantic versioning for production environment"
-        value: ${{ jobs.aws-build.outputs.release_version }}
+        value: ${{ jobs.docker-build-push.outputs.release_version }}
+    
     secrets: 
       CICD_AWS_ACCESS_KEY_ID:
         required: true
@@ -63,8 +64,18 @@ on:
         required: true
       INFRA_AWS_REGION:
         required: true
+      SHARED_AWS_ACCESS_KEY_ID:
+        required: true
+      SHARED_AWS_SECRET_ACCESS_KEY:
+        required: true
+      SHARED_AWS_REGION:
+        required: true
       GOOGLE_WEBHOOK:
         required: true
+      DOCKERHUB_USERNAME:
+        required: false
+      DOCKERHUB_PASSWORD:
+        required: false
 
 jobs:
 
@@ -80,6 +91,8 @@ jobs:
       STAGE_SHORT: ${{ steps.stage.outputs.STAGE_SHORT }}
       SERVICE_NAME: ${{ steps.set-project-name.outputs.SERVICE_NAME }}
       PROJECT: ${{ steps.set-project-name.outputs.PROJECT }}
+      SERVICE_TYPE: ${{ steps.set-project-name.outputs.SERVICE_TYPE }}
+      ECR_REPOSITORY: ${{ steps.set-project-name.outputs.ECR_REPOSITORY }}
     steps:   
 
       - name: Check Inputs
@@ -101,12 +114,12 @@ jobs:
         if: contains( inputs.runner, 'k8s-runners-stg' )
         uses: unfor19/install-aws-cli-action@v1
         with:
-          version: 2     # default
-          verbose: false # default
-          arch: amd64    # allowed values: amd64, 
+          version: 2
+          verbose: false
+          arch: amd64
           
       - name: Configure AWS Credentials - INFRA
-        uses: aws-actions/configure-aws-credentials@v1
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.INFRA_AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.INFRA_AWS_SECRET_ACCESS_KEY }}
@@ -153,21 +166,21 @@ jobs:
         env:
           STAGE_INPUT: ${{ inputs.stage }}
         run: |
-          if [[ -z "$STAGE_INPUT" ]]; then  # Check for empty STAGE_INPUT
+          if [[ -z "$STAGE_INPUT" ]]; then
             echo "STAGE_INPUT is empty. Defaulting to prod."
             echo "ENVIRONMENT=prod" >> $GITHUB_ENV
             if [[ "${{ github.event_name }}" == 'release' && "${{ github.event.release.prerelease }}" == true ]]; then
               echo "This is a pre-release."
               echo "STAGE=beta" >> $GITHUB_ENV
               echo "STAGE=beta" >> $GITHUB_OUTPUT
-              echo "STAGE_SHORT=$STAGE_INPUT" >> $GITHUB_ENV  # Keep STAGE_SHORT as is
-              echo "STAGE_SHORT=$STAGE_INPUT" >> $GITHUB_OUTPUT  # Keep STAGE_SHORT as is
+              echo "STAGE_SHORT=$STAGE_INPUT" >> $GITHUB_ENV
+              echo "STAGE_SHORT=$STAGE_INPUT" >> $GITHUB_OUTPUT
               elif [[ "${{ github.event_name }}" == 'release' ]]; then
               echo "This is a full release."
               echo "STAGE=production" >> $GITHUB_ENV
               echo "STAGE=production" >> $GITHUB_OUTPUT
-              echo "STAGE_SHORT=$STAGE_INPUT" >> $GITHUB_ENV  # Keep STAGE_SHORT as is
-              echo "STAGE_SHORT=$STAGE_INPUT" >> $GITHUB_OUTPUT  # Keep STAGE_SHORT as is
+              echo "STAGE_SHORT=$STAGE_INPUT" >> $GITHUB_ENV
+              echo "STAGE_SHORT=$STAGE_INPUT" >> $GITHUB_OUTPUT
             fi
           else
             if [[ "$STAGE_INPUT" =~ ^staging([1-9]|10)?$ ]]; then
@@ -183,8 +196,8 @@ jobs:
               echo "ENVIRONMENT=prod" >> $GITHUB_ENV
               echo "STAGE=$STAGE_INPUT" >> $GITHUB_ENV
               echo "STAGE=$STAGE_INPUT" >> $GITHUB_OUTPUT
-              echo "STAGE_SHORT=$STAGE_INPUT" >> $GITHUB_ENV  # Keep STAGE_SHORT as is
-              echo "STAGE_SHORT=$STAGE_INPUT" >> $GITHUB_OUTPUT  # Keep STAGE_SHORT as is
+              echo "STAGE_SHORT=$STAGE_INPUT" >> $GITHUB_ENV
+              echo "STAGE_SHORT=$STAGE_INPUT" >> $GITHUB_OUTPUT
             fi
           fi
 
@@ -228,103 +241,123 @@ jobs:
           echo "RELEASE_VERSION=$RELEASE_VERSION" >> $GITHUB_ENV
           echo "BRANCH_NAME=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
 
-      - name: Get AWS Codebuild project
+      - name: Get service info from config
         id: set-project-name
         shell: bash
         run: |
-          SERVICE_NAME=$(cat .infra/infra-config.json | jq .name | tr -d '"')
+          SERVICE_NAME=$(cat .infra/infra-config.json | jq -r .name)
+          SERVICE_TYPE=$(cat .infra/infra-config.json | jq -r .type // "service")
+          
           echo "SERVICE_NAME=$SERVICE_NAME"
           echo "SERVICE_NAME=$SERVICE_NAME" >> $GITHUB_ENV
           echo "SERVICE_NAME=$SERVICE_NAME" >> $GITHUB_OUTPUT
+          
+          echo "SERVICE_TYPE=$SERVICE_TYPE"
+          echo "SERVICE_TYPE=$SERVICE_TYPE" >> $GITHUB_ENV
+          echo "SERVICE_TYPE=$SERVICE_TYPE" >> $GITHUB_OUTPUT
+          
           echo "PROJECT=$(echo $SERVICE_NAME-${{ env.STAGE }})"
           echo "PROJECT=$(echo $SERVICE_NAME-${{ env.STAGE }})" >> $GITHUB_ENV
           echo "PROJECT=$(echo $SERVICE_NAME-${{ env.STAGE }})" >> $GITHUB_OUTPUT
+          
+          echo "ECR_REPOSITORY=$SERVICE_NAME"
+          echo "ECR_REPOSITORY=$SERVICE_NAME" >> $GITHUB_ENV
+          echo "ECR_REPOSITORY=$SERVICE_NAME" >> $GITHUB_OUTPUT
 
-  codebuild-check:
+  check-stage:
     runs-on: ${{ inputs.runner }}
-    name: Codebuild Project Checks
+    name: Check Stage Configuration
     needs: sets-variables
     outputs:
-      new_stage: ${{ steps.check-project.outputs.new_stage }}
-      project_exist: ${{ steps.check-project.outputs.project_exist }}
-      codebuild_project: ${{ env.CODEBUILD_PROJECT }}
+      new_stage: ${{ steps.check-stage-config.outputs.new_stage }}
+      stage_check: ${{ steps.check-stage-config.outputs.stage_check }}
       
     steps:
-
       - id: install-aws-cli
         if: contains( inputs.runner, 'k8s-runners-stg' )
         uses: unfor19/install-aws-cli-action@v1
         with:
-          version: 2     # default
-          verbose: false # default
-          arch: amd64    # allowed values: amd64, arm64
+          version: 2
+          verbose: false
+          arch: amd64
 
-      - name: Configure AWS Credentials - CICD
+      - name: Configure AWS Credentials - INFRA
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.CICD_AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.CICD_AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.CICD_AWS_REGION }}
+          aws-access-key-id: ${{ secrets.INFRA_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.INFRA_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.INFRA_AWS_REGION }}
 
-      - name: Check if project exists
-        id: check-project
+      - name: Check if stage configuration exists
+        id: check-stage-config
         shell: bash
         run: |
-          CODEBUILD=$(aws codebuild list-projects --region ${{ secrets.CICD_AWS_REGION }} --query 'projects[?ends_with(@,`${{ needs.sets-variables.outputs.PROJECT }}`) == `true`]' | jq ".[0]" | tr -d '"')
-          echo "Codebuild project: "$CODEBUILD
-          if [[ $CODEBUILD != "null" ]]; \
-          then \
-            echo "new_stage=false"; \
-            echo "new_stage=false" >> $GITHUB_OUTPUT; \
-            echo "project_exist=true"; \
-            echo "project_exist=true" >> $GITHUB_OUTPUT; \
-          elif [[ $CODEBUILD == "null" ]]; \
-          then \
-            echo "project_exist=false"; \
-            echo "project_exist=false" >> $GITHUB_OUTPUT; \
-            echo "new_stage=true"; \
-            echo "new_stage=true" >> $GITHUB_OUTPUT; \
+          # Verificar si existe la configuración para este stage
+          CONFIG_EXISTS=$(aws s3 ls s3://cor-infra-us-east-2-services-configs/${{ github.repository }}-${{ needs.sets-variables.outputs.STAGE }}.json 2>/dev/null || echo "false")
+          
+          if [[ "$CONFIG_EXISTS" == "false" ]]; then
+            echo "new_stage=true"
+            echo "new_stage=true" >> $GITHUB_OUTPUT
+            echo "stage_check=false"
+            echo "stage_check=false" >> $GITHUB_OUTPUT
+          else
+            echo "new_stage=false"
+            echo "new_stage=false" >> $GITHUB_OUTPUT
+            echo "stage_check=true"
+            echo "stage_check=true" >> $GITHUB_OUTPUT
           fi
-          echo "CODEBUILD_PROJECT=$CODEBUILD"
-          echo "CODEBUILD_PROJECT=$CODEBUILD" >> $GITHUB_OUTPUT
-          echo "CODEBUILD_PROJECT=$CODEBUILD" >> $GITHUB_ENV
 
-  aws-build:
+  docker-build-push:
     runs-on: ${{ inputs.runner }}
-    name: AWS CodeBuild Trigger and Helm Push
-    needs: [sets-variables, codebuild-check]
+    name: Docker Build and Push to ECR
+    needs: [sets-variables, check-stage]
     outputs:
-      release_version: ${{ env.RELEASE_VERSION }}
+      release_version: ${{ steps.set-release-version.outputs.RELEASE_VERSION }}
+      env_check: ${{ steps.build-complete.outputs.env_check }}
     steps:
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Checkout Infra Templates
+        uses: actions/checkout@v4
+        with:
+          repository: ProjectCORTeam/infra-service-templates
+          ref: ${{ inputs.infra_templates_version }}
+          path: infra-templates
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - id: install-aws-cli
         if: contains( inputs.runner, 'k8s-runners-stg' )
         uses: unfor19/install-aws-cli-action@v1
         with:
-          version: 2     # default
-          verbose: false # default
-          arch: amd64    # allowed values: amd64, arm64
+          version: 2
+          verbose: false
+          arch: amd64
 
-      - name: Set release version - Staging
-        id: set-release-staging
-        if: startsWith(inputs.stage, 'staging')
+      - name: Set release version
+        id: set-release-version
         run: |
-          RELEASE_VERSION=${{ inputs.stage }}
-          RELEASE_VERSION=$(echo $RELEASE_VERSION | sed s/staging/v/g)
-          RELEASE_VERSION=$RELEASE_VERSION".0.0-staging-"${{ needs.sets-variables.outputs.SHORT_COMMIT_HASH}}
+          if [[ "${{ inputs.stage }}" =~ ^staging ]]; then
+            RELEASE_VERSION=${{ inputs.stage }}
+            RELEASE_VERSION=$(echo $RELEASE_VERSION | sed s/staging/v/g)
+            RELEASE_VERSION=$RELEASE_VERSION".0.0-staging-"${{ needs.sets-variables.outputs.SHORT_COMMIT_HASH}}
+            RUN_ENV="staging"
+          elif [[ "${{ inputs.stage }}" == "production" ]] || [[ "${{ inputs.stage }}" == "beta" ]] || [[ -z "${{ inputs.stage }}" ]]; then
+            RELEASE_VERSION=${{ needs.sets-variables.outputs.RELEASE_TAG }}
+            RUN_ENV="prod"
+          fi
+          
           echo "RELEASE_VERSION=$RELEASE_VERSION" >> $GITHUB_ENV
           echo "RELEASE_VERSION=$RELEASE_VERSION" >> $GITHUB_OUTPUT
-          echo "Final staging release version: "$RELEASE_VERSION
+          echo "RUN_ENV=$RUN_ENV" >> $GITHUB_ENV
+          echo "RUN_ENV=$RUN_ENV" >> $GITHUB_OUTPUT
+          echo "Final release version: $RELEASE_VERSION"
+          echo "Environment: $RUN_ENV"
 
-      - name: Set release version - Production
-        id: set-release-prod
-        if: contains(fromJson('["production", "beta", ""]'), inputs.stage)
-        run: |
-          echo "RELEASE_VERSION=${{ needs.sets-variables.outputs.RELEASE_TAG }}" >> $GITHUB_ENV
-          echo "RELEASE_VERSION=${{ needs.sets-variables.outputs.RELEASE_TAG }}" >> $GITHUB_OUTPUT
-          echo "Final production release version: $RELEASE_VERSION }}"
-
-      - name: Configure AWS Credentials - Shared
+      - name: Configure AWS Credentials - Shared (for ECR)
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.SHARED_AWS_ACCESS_KEY_ID }}
@@ -335,89 +368,141 @@ jobs:
         id: check-ecr-tag
         continue-on-error: true
         run: |
-          ECR_REPOSITORY=$(aws ecr describe-repositories --region ${{ secrets.SHARED_AWS_REGION }} --query 'repositories[?ends_with(repositoryName, `${{ needs.sets-variables.outputs.SERVICE_NAME}}`) == `true`]' | jq ".[0].repositoryName" | tr -d '"')
-          echo "ECR Repository: "$ECR_REPOSITORY
-
-          if [[ ${{startsWith(inputs.stage, 'staging')}} ]]; then
-            aws ecr describe-images --repository-name $ECR_REPOSITORY --region ${{ secrets.SHARED_AWS_REGION }} --image-ids imageTag=${{ env.RELEASE_VERSION}}
-          else
-            aws ecr describe-images --repository-name $ECR_REPOSITORY --region ${{ secrets.SHARED_AWS_REGION }} --image-ids imageTag=${{ needs.sets-variables.outputs.RELEASE_TAG}}
-          fi
+          aws ecr describe-images \
+            --repository-name ${{ needs.sets-variables.outputs.ECR_REPOSITORY }} \
+            --region ${{ secrets.SHARED_AWS_REGION }} \
+            --image-ids imageTag=${{ env.RELEASE_VERSION }}
 
       - name: Check ECR image tag outcome
         id: check-ecr
         run: |
-          echo "ECR check outcome: "${{steps.check-ecr-tag.outcome}}
-          if [ '${{steps.check-ecr-tag.outcome}}' == 'failure' ]; then
+          echo "ECR check outcome: ${{ steps.check-ecr-tag.outcome }}"
+          if [ '${{ steps.check-ecr-tag.outcome }}' == 'failure' ]; then
             echo "Release version is not builded"
-            ECR_IMAGE_EXIST=false
-          elif [ '${{steps.check-ecr-tag.outcome}}' == 'success' ]; then
+            echo "ECR_IMAGE_EXIST=false" >> $GITHUB_ENV
+          elif [ '${{ steps.check-ecr-tag.outcome }}' == 'success' ]; then
             echo "Release version is already builded"
-            ECR_IMAGE_EXIST=true
+            echo "ECR_IMAGE_EXIST=true" >> $GITHUB_ENV
           fi
-          echo "ECR_IMAGE_EXIST=$ECR_IMAGE_EXIST" >> $GITHUB_ENV;
-          echo "ECR_IMAGE_EXIST=$ECR_IMAGE_EXIST" >> $GITHUB_OUTPUT;
-          echo "ECR_IMAGE_EXIST=$ECR_IMAGE_EXIST"
 
-      - name: Configure AWS Credentials - CICD
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.CICD_AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.CICD_AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.CICD_AWS_REGION }}
-
-      - name: Select Codebuild Source
-        id: select-source
-        shell: bash
+      - name: Run custom install script
+        if: (inputs.force_build || env.ECR_IMAGE_EXIST == 'false') && hashFiles('.infra/cicd/install.sh') != ''
         run: |
-          if [[ ${{needs.sets-variables.outputs.RELEASE_TAG}} != "null" ]]; then \
-            CODEBUILD_SOURCE=${{needs.sets-variables.outputs.RELEASE_TAG}}
-          else
-            CODEBUILD_SOURCE=$GITHUB_REF_NAME
-          fi
-          echo "CODEBUILD_SOURCE=$CODEBUILD_SOURCE"
-          echo "CODEBUILD_SOURCE=$CODEBUILD_SOURCE" >> $GITHUB_ENV 
-          echo "CODEBUILD_SOURCE=$CODEBUILD_SOURCE" >> $GITHUB_OUTPUT
+          chmod +x .infra/cicd/install.sh
+          ./.infra/cicd/install.sh
 
-      - name: Get Codebuild Project Name
-        id: get_project_name
-        if: needs.codebuild-check.outputs.project_exist
-        shell: bash
+      - name: Run custom pre-build script
+        if: (inputs.force_build || env.ECR_IMAGE_EXIST == 'false') && hashFiles('.infra/cicd/pre-build.sh') != ''
         run: |
-          CODEBUILD=$(aws codebuild list-projects --region ${{ secrets.CICD_AWS_REGION }} --query 'projects[?ends_with(@,`${{ needs.sets-variables.outputs.PROJECT }}`) == `true`]' | jq ".[0]" | tr -d '"') || ${{ inputs.force_build }}
-          echo "CODEBUILD_PROJECT_FINAL=$CODEBUILD" 
-          echo "CODEBUILD_PROJECT_FINAL=$CODEBUILD" >> $GITHUB_ENV
+          chmod +x .infra/cicd/pre-build.sh
+          ./.infra/cicd/pre-build.sh
 
-      - name: Run AWS CodeBuild
-        id: codebuild
-        if: inputs.force_build || (contains(fromJson('["true"]'), needs.codebuild-check.outputs.project_exist) && contains(fromJson('["push", "release", "workflow_dispatch"]'), github.event_name) && contains(fromJson('["failure"]'), steps.check-ecr-tag.outcome))
-        uses: dark-mechanicum/aws-codebuild@v1
-        env:
-          CODEBUILD__sourceVersion: ${{ env.CODEBUILD_SOURCE }}
-          CODEBUILD__logsConfigOverride__cloudWatchLogs__status: 'ENABLED'
+      - name: Login to Amazon ECR
+        if: inputs.force_build || env.ECR_IMAGE_EXIST == 'false'
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
         with:
-          projectName: ${{ env.CODEBUILD_PROJECT_FINAL }}
-          buildspec: '{
-              "environmentVariablesOverride":[
-                { "name":"RELEASE_VERSION", "value":"${{ env.RELEASE_VERSION }}", "type": "PLAINTEXT" },
-                { "name":"INFRA_TEMPLATE_VERSION", "value":"${{ inputs.infra_templates_version }}", "type": "PLAINTEXT" }
-              ]
-            }'
+          mask-password: 'true'
 
-      - name: Google Chat Notification - Without codebuild
-        if: contains(fromJson('["true"]'), needs.codebuild-check.outputs.project_exist ) && contains(fromJson('["push", "release", "workflow_dispatch"]'), github.event_name) && contains(fromJson('["success"]'), steps.check-ecr-tag.outcome)
+      - name: Set up Docker Buildx
+        if: inputs.force_build || env.ECR_IMAGE_EXIST == 'false'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Extract Docker metadata
+        if: inputs.force_build || env.ECR_IMAGE_EXIST == 'false'
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.login-ecr.outputs.registry }}/${{ needs.sets-variables.outputs.ECR_REPOSITORY }}
+          tags: |
+            type=raw,value=${{ env.RELEASE_VERSION }}
+            type=raw,value=${{ needs.sets-variables.outputs.STAGE }},enable=${{ env.RUN_ENV == 'prod' }}
+            type=raw,value=latest,enable=${{ env.RUN_ENV == 'prod' && needs.sets-variables.outputs.STAGE == 'production' }}
+
+      - name: Run custom build script
+        if: (inputs.force_build || env.ECR_IMAGE_EXIST == 'false') && hashFiles('.infra/cicd/build.sh') != ''
+        run: |
+          chmod +x .infra/cicd/build.sh
+          ./.infra/cicd/build.sh
+
+      - name: Build and push Docker image
+        if: inputs.force_build || env.ECR_IMAGE_EXIST == 'false'
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            RELEASE_VERSION=${{ env.RELEASE_VERSION }}
+            STAGE=${{ needs.sets-variables.outputs.STAGE }}
+            RUN_ENV=${{ env.RUN_ENV }}
+
+      - name: Install Helm
+        if: inputs.force_build || env.ECR_IMAGE_EXIST == 'false'
+        uses: azure/setup-helm@v4
+        with:
+          version: 'v3.14.4'
+
+      - name: Setup Helm Chart Museum
+        if: inputs.force_build || env.ECR_IMAGE_EXIST == 'false'
+        run: |
+          helm plugin install https://github.com/chartmuseum/helm-push || true
+          helm repo add cor https://chartmuseum.shared.projectcor.com
+          helm repo update
+
+      - name: Package and Push Helm Chart
+        if: inputs.force_build || env.ECR_IMAGE_EXIST == 'false'
+        run: |
+          cd infra-templates/templates/simple-service-persistence/simple-eks/kubernetes/service/
+          
+          # Reemplazar variables en los templates
+          find . -type f -exec sed -i 's/\$TEMPLATE_SERVICE_NAME/'"${{ needs.sets-variables.outputs.SERVICE_NAME }}"'/g' {} +
+          find . -type f -exec sed -i 's/\$TEMPLATE_SERVICE_TYPE/'"${{ needs.sets-variables.outputs.SERVICE_TYPE }}"'/g' {} +
+          
+          # Empaquetar y pushear el chart
+          helm package . --version ${{ env.RELEASE_VERSION }} --app-version ${{ env.RELEASE_VERSION }}
+          helm cm-push ${{ needs.sets-variables.outputs.SERVICE_TYPE }}-${{ needs.sets-variables.outputs.SERVICE_NAME }}-${{ env.RELEASE_VERSION }}.tgz cor -f
+
+      - name: Run custom post-build script
+        if: (inputs.force_build || env.ECR_IMAGE_EXIST == 'false') && hashFiles('.infra/cicd/post-build.sh') != ''
+        run: |
+          chmod +x .infra/cicd/post-build.sh
+          ./.infra/cicd/post-build.sh
+
+      - name: Build complete
+        id: build-complete
+        run: |
+          echo "env_check=success" >> $GITHUB_OUTPUT
+
+      - name: Google Chat Notification - Build Success
+        if: inputs.notifications && (inputs.force_build || env.ECR_IMAGE_EXIST == 'false')
         uses: nakamuraos/google-chat-notifications@v2.1.0
         with:
-          title: Image Build
+          title: Image Build Success
           subtitle: ${{ env.RELEASE_VERSION }}
           webhookUrl: ${{ secrets.GOOGLE_WEBHOOK }}
           status: 'success'
 
-      - name: Output checks
-        shell: bash
+      - name: Google Chat Notification - Image Already Exists
+        if: inputs.notifications && env.ECR_IMAGE_EXIST == 'true' && !inputs.force_build
+        uses: nakamuraos/google-chat-notifications@v2.1.0
+        with:
+          title: Image Build Skipped
+          subtitle: ${{ env.RELEASE_VERSION }} already exists
+          webhookUrl: ${{ secrets.GOOGLE_WEBHOOK }}
+          status: 'success'
+
+      - name: Output summary
         run: |
-          echo "new_stage: " ${{ needs.codebuild-check.outputs.project_exist }}
-          echo "stage_check: " ${{ needs.codebuild-check.outputs.project_exist }}
-          echo "stage: " ${{ env.stage }}
-          echo "env_check: " ${{ steps.get_project_name.outcome }}
-          echo "release_version: " ${{ env.RELEASE_VERSION}}
+          echo "### Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Service:** ${{ needs.sets-variables.outputs.SERVICE_NAME }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Stage:** ${{ needs.sets-variables.outputs.STAGE }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Release Version:** ${{ env.RELEASE_VERSION }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment:** ${{ env.RUN_ENV }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **ECR Repository:** ${{ needs.sets-variables.outputs.ECR_REPOSITORY }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image Already Exists:** ${{ env.ECR_IMAGE_EXIST }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Build Forced:** ${{ inputs.force_build }}" >> $GITHUB_STEP_SUMMARY
