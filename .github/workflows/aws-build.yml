@@ -321,13 +321,23 @@ jobs:
         with:
           fetch-depth: 1
 
+      - name: Cache Infra Templates
+        id: cache-infra-templates
+        uses: actions/cache@v4
+        with:
+          path: infra-templates
+          key: infra-templates-${{ inputs.infra_templates_version }}-${{ hashFiles('.infra/cicd/*.sh') }}
+
       - name: Checkout Infra Templates
+        if: steps.cache-infra-templates.outputs.cache-hit != 'true'
         uses: actions/checkout@v4
         with:
           repository: ProjectCORTeam/infra-service-templates
           ref: ${{ inputs.infra_templates_version }}
           path: infra-templates
           token: ${{ secrets.GITHUB_TOKEN }}
+          sparse-checkout: |
+            templates/simple-service-persistence/simple-eks/kubernetes/service/
 
       - id: install-aws-cli
         if: contains( inputs.runner, 'k8s-runners-stg' )
@@ -385,17 +395,22 @@ jobs:
             echo "ECR_IMAGE_EXIST=true" >> $GITHUB_ENV
           fi
 
-      - name: Run custom install script
-        if: (inputs.force_build || env.ECR_IMAGE_EXIST == 'false') && hashFiles('.infra/cicd/install.sh') != ''
+      - name: Run custom scripts in parallel
+        if: (inputs.force_build || env.ECR_IMAGE_EXIST == 'false')
         run: |
-          chmod +x .infra/cicd/install.sh
-          ./.infra/cicd/install.sh
-
-      - name: Run custom pre-build script
-        if: (inputs.force_build || env.ECR_IMAGE_EXIST == 'false') && hashFiles('.infra/cicd/pre-build.sh') != ''
-        run: |
-          chmod +x .infra/cicd/pre-build.sh
-          ./.infra/cicd/pre-build.sh
+          # Ejecutar scripts en paralelo cuando sea posible
+          if [ -f ".infra/cicd/install.sh" ]; then
+            chmod +x .infra/cicd/install.sh
+            ./.infra/cicd/install.sh &
+          fi
+          
+          if [ -f ".infra/cicd/pre-build.sh" ]; then
+            chmod +x .infra/cicd/pre-build.sh
+            ./.infra/cicd/pre-build.sh &
+          fi
+          
+          # Esperar a que terminen todos los scripts
+          wait
 
       - name: Login to Amazon ECR
         if: inputs.force_build || env.ECR_IMAGE_EXIST == 'false'
@@ -407,6 +422,10 @@ jobs:
       - name: Set up Docker Buildx
         if: inputs.force_build || env.ECR_IMAGE_EXIST == 'false'
         uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: |
+            image=moby/buildkit:latest
+            network=host
 
       - name: Extract Docker metadata
         if: inputs.force_build || env.ECR_IMAGE_EXIST == 'false'
@@ -433,18 +452,32 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: |
+            type=gha
+            type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ needs.sets-variables.outputs.ECR_REPOSITORY }}:cache
+          cache-to: |
+            type=gha,mode=max
+            type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ needs.sets-variables.outputs.ECR_REPOSITORY }}:cache,mode=max
           build-args: |
             RELEASE_VERSION=${{ env.RELEASE_VERSION }}
             STAGE=${{ needs.sets-variables.outputs.STAGE }}
             RUN_ENV=${{ env.RUN_ENV }}
+          platforms: linux/amd64
 
       - name: Install Helm
         if: inputs.force_build || env.ECR_IMAGE_EXIST == 'false'
         uses: azure/setup-helm@v4
         with:
           version: 'v3.14.4'
+
+      - name: Cache Helm Repository
+        if: inputs.force_build || env.ECR_IMAGE_EXIST == 'false'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/helm/repository
+            ~/.config/helm
+          key: helm-repo-${{ inputs.stage }}-${{ hashFiles('.infra/cicd/*.sh') }}
 
       - name: Setup Helm Chart Museum
         if: inputs.force_build || env.ECR_IMAGE_EXIST == 'false'
@@ -458,13 +491,13 @@ jobs:
         run: |
           cd infra-templates/templates/simple-service-persistence/simple-eks/kubernetes/service/
           
-          # Reemplazar variables en los templates
-          find . -type f -exec sed -i 's/\$TEMPLATE_SERVICE_NAME/'"${{ needs.sets-variables.outputs.SERVICE_NAME }}"'/g' {} +
-          find . -type f -exec sed -i 's/\$TEMPLATE_SERVICE_TYPE/'"${{ needs.sets-variables.outputs.SERVICE_TYPE }}"'/g' {} +
+          # Reemplazar variables en los templates (optimizado)
+          sed -i 's/\$TEMPLATE_SERVICE_NAME/'"${{ needs.sets-variables.outputs.SERVICE_NAME }}"'/g' Chart.yaml values.yaml
+          sed -i 's/\$TEMPLATE_SERVICE_TYPE/'"${{ needs.sets-variables.outputs.SERVICE_TYPE }}"'/g' Chart.yaml values.yaml
           
-          # Empaquetar y pushear el chart
+          # Empaquetar y pushear el chart (con timeout)
           helm package . --version ${{ env.RELEASE_VERSION }} --app-version ${{ env.RELEASE_VERSION }}
-          helm cm-push ${{ needs.sets-variables.outputs.SERVICE_TYPE }}-${{ needs.sets-variables.outputs.SERVICE_NAME }}-${{ env.RELEASE_VERSION }}.tgz cor -f
+          timeout 60 helm cm-push ${{ needs.sets-variables.outputs.SERVICE_TYPE }}-${{ needs.sets-variables.outputs.SERVICE_NAME }}-${{ env.RELEASE_VERSION }}.tgz cor -f
 
       - name: Run custom post-build script
         if: (inputs.force_build || env.ECR_IMAGE_EXIST == 'false') && hashFiles('.infra/cicd/post-build.sh') != ''
@@ -478,7 +511,7 @@ jobs:
           echo "env_check=success" >> $GITHUB_OUTPUT
 
       - name: Google Chat Notification - Build Success
-        if: inputs.notifications && (inputs.force_build || env.ECR_IMAGE_EXIST == 'false')
+        if: inputs.notifications && (inputs.force_build || env.ECR_IMAGE_EXIST == 'false') && (needs.sets-variables.outputs.STAGE == 'production' || needs.sets-variables.outputs.STAGE == 'beta')
         uses: nakamuraos/google-chat-notifications@v2.1.0
         with:
           title: Image Build Success
@@ -487,7 +520,7 @@ jobs:
           status: 'success'
 
       - name: Google Chat Notification - Image Already Exists
-        if: inputs.notifications && env.ECR_IMAGE_EXIST == 'true' && !inputs.force_build
+        if: inputs.notifications && env.ECR_IMAGE_EXIST == 'true' && !inputs.force_build && (needs.sets-variables.outputs.STAGE == 'production' || needs.sets-variables.outputs.STAGE == 'beta')
         uses: nakamuraos/google-chat-notifications@v2.1.0
         with:
           title: Image Build Skipped
