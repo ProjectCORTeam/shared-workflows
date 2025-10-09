@@ -76,6 +76,9 @@ on:
         required: false
       DOCKERHUB_PASSWORD:
         required: false
+      GH_PAT:
+        required: true
+        description: "Personal Access Token para acceder a repositorios privados"
 
 jobs:
 
@@ -329,7 +332,7 @@ jobs:
           repository: ProjectCORTeam/infra-service-templates
           ref: ${{ inputs.infra_templates_version }}
           path: infra-templates
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.GH_PAT }}
 
       - id: install-aws-cli
         if: contains( inputs.runner, 'k8s-runners-stg' )
