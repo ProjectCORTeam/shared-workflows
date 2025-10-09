@@ -332,7 +332,7 @@ jobs:
           repository: ProjectCORTeam/infra-service-templates
           ref: ${{ inputs.infra_templates_version }}
           path: infra-templates
-          token: ${{ secrets.GH_PAT }}
+          token: ${{ secrets.ACTIONS_TOKEN }}
 
       - id: install-aws-cli
         if: contains( inputs.runner, 'k8s-runners-stg' )
