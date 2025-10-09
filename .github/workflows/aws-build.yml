@@ -412,19 +412,12 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ steps.login-ecr.outputs.registry }}/${{ needs.sets-variables.outputs.ECR_REPOSITORY }}
+          images: ${{ steps.login-ecr.outputs.registry }}/cor-shared-us-east-2-${{ needs.sets-variables.outputs.SERVICE_TYPE }}-${{ needs.sets-variables.outputs.SERVICE_NAME }}
           tags: |
             type=raw,value=${{ env.RELEASE_VERSION }}
             type=raw,value=${{ needs.sets-variables.outputs.STAGE }}
           #  type=raw,value=${{ needs.sets-variables.outputs.STAGE }},enable=${{ env.RUN_ENV == 'prod' }}
           #  type=raw,value=latest,enable=${{ env.RUN_ENV == 'prod' && needs.sets-variables.outputs.STAGE == 'production' }}
-
-      - name: Testing images variables
-        run: |
-          echo 'esta es mi regestry ${{ steps.login-ecr.outputs.registry }}'
-          echo 'esta es mi repository ${{ needs.sets-variables.outputs.ECR_REPOSITORY }}'
-          echo 'esta es mi stage ${{ needs.sets-variables.outputs.STAGE }}'
-          echo 'esta es mi release version ${{ env.RELEASE_VERSION }}'
           
       - name: Run custom build script
         if: (inputs.force_build || env.ECR_IMAGE_EXIST == 'false') && hashFiles('.infra/cicd/build.sh') != ''
