@@ -390,12 +390,6 @@ jobs:
             echo "ECR_IMAGE_EXIST=true" >> $GITHUB_ENV
           fi
 
-      - name: Run custom install script
-        if: (inputs.force_build || env.ECR_IMAGE_EXIST == 'false') && hashFiles('.infra/cicd/install.sh') != ''
-        run: |
-          chmod +x .infra/cicd/install.sh
-          ./.infra/cicd/install.sh
-
       - name: Run custom pre-build script
         if: (inputs.force_build || env.ECR_IMAGE_EXIST == 'false') && hashFiles('.infra/cicd/pre-build.sh') != ''
         run: |
@@ -427,7 +421,8 @@ jobs:
 
       - name: Testing images variables
         run: |
-          echo 'esta es mi imagen ${{ steps.login-ecr.outputs.registry }}/${{ needs.sets-variables.outputs.ECR_REPOSITORY }}'
+          echo 'esta es mi regestry ${{ steps.login-ecr.outputs.registry }}'
+          echo 'esta es mi repository ${{ needs.sets-variables.outputs.ECR_REPOSITORY }}'
           echo 'esta es mi stage ${{ needs.sets-variables.outputs.STAGE }}'
           echo 'esta es mi release version ${{ env.RELEASE_VERSION }}'
           
