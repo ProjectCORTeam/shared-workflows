@@ -247,8 +247,8 @@ jobs:
         id: set-project-name
         shell: bash
         run: |
-          SERVICE_NAME=$(cat .infra/infra-config.json | jq -r .name)
-          SERVICE_TYPE=$(cat .infra/infra-config.json | jq -r .type // "service")
+          SERVICE_NAME=$(jq -r '.name' .infra/infra-config.json)
+          SERVICE_TYPE=$(jq -r '.type // "service"' .infra/infra-config.json)
           
           echo "SERVICE_NAME=$SERVICE_NAME"
           echo "SERVICE_NAME=$SERVICE_NAME" >> $GITHUB_ENV
