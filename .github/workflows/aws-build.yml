@@ -446,7 +446,7 @@ jobs:
         with:
           version: 'v3.14.4'
 
-      - name: Setup Helm Chart Museum
+      - name: Setup Helm ChartMuseum
         if: inputs.force_build || env.ECR_IMAGE_EXIST == 'false'
         run: |
           helm plugin install https://github.com/chartmuseum/helm-push || true
