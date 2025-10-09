@@ -432,10 +432,11 @@ jobs:
           #  type=raw,value=${{ needs.sets-variables.outputs.STAGE }},enable=${{ env.RUN_ENV == 'prod' }}
           #  type=raw,value=latest,enable=${{ env.RUN_ENV == 'prod' && needs.sets-variables.outputs.STAGE == 'production' }}
 
-      - name: Run custom build script
-        if: (inputs.force_build || env.ECR_IMAGE_EXIST == 'false') && hashFiles('.infra/cicd/build.sh') != ''
+      - name: Testing images variables
         run: |
           echo 'esta es mi imagen ${{ steps.login-ecr.outputs.registry }}/${{ needs.sets-variables.outputs.ECR_REPOSITORY }}'
+          echo 'esta es mi stage ${{ env.STAGE }}'
+          echo 'esta es mi release version ${{ env.RELEASE_VERSION }}'
           
       - name: Run custom build script
         if: (inputs.force_build || env.ECR_IMAGE_EXIST == 'false') && hashFiles('.infra/cicd/build.sh') != ''
