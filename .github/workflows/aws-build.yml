@@ -129,7 +129,9 @@ jobs:
         id: sync-infra-config
         run: |
           aws s3 cp s3://cor-infra-us-east-2-services-configs/${{ github.repository }}.json .infra/infra-config.json
-  
+          ls -la .infra/
+          cat .infra/infra-config.json
+
       - name: Get Commit Hash
         id: get-commit-ids
         run: |
@@ -506,4 +508,3 @@ jobs:
           echo "- **ECR Repository:** ${{ needs.sets-variables.outputs.ECR_REPOSITORY }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Image Already Exists:** ${{ env.ECR_IMAGE_EXIST }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Build Forced:** ${{ inputs.force_build }}" >> $GITHUB_STEP_SUMMARY
-          
