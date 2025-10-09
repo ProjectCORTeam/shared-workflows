@@ -425,7 +425,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ needs.sets-variables.outputs.ECR_REPOSITORY }}
+          images: ${{ steps.login-ecr.outputs.registry }}/${{ needs.sets-variables.outputs.ECR_REPOSITORY }}
           tags: |
             type=raw,value=${{ env.RELEASE_VERSION }}
             type=raw,value=${{ needs.sets-variables.outputs.STAGE }},enable=${{ env.RUN_ENV == 'prod' }}
