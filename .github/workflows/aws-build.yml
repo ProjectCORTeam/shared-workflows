@@ -93,8 +93,8 @@ jobs:
       STAGE: ${{ steps.stage.outputs.STAGE }}
       STAGE_SHORT: ${{ steps.stage.outputs.STAGE_SHORT }}
       SERVICE_NAME: ${{ steps.set-project-name.outputs.SERVICE_NAME }}
-      PROJECT: ${{ steps.set-project-name.outputs.PROJECT }}
       SERVICE_TYPE: ${{ steps.set-project-name.outputs.SERVICE_TYPE }}
+      PROJECT: ${{ steps.set-project-name.outputs.PROJECT }}
       ECR_REPOSITORY: ${{ steps.set-project-name.outputs.ECR_REPOSITORY }}
     steps:   
 
