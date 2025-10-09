@@ -369,6 +369,13 @@ jobs:
           aws-secret-access-key: ${{ secrets.SHARED_AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.SHARED_AWS_REGION }}
 
+      - name: Create ECR repository if not exists
+        continue-on-error: true
+        run: |
+          aws ecr create-repository \
+            --repository-name ${{ needs.sets-variables.outputs.ECR_REPOSITORY }} \
+            --region ${{ secrets.SHARED_AWS_REGION }} || echo "Repository already exists"
+
       - name: Check ECR image tag
         id: check-ecr-tag
         continue-on-error: true
