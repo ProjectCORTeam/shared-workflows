@@ -434,6 +434,11 @@ jobs:
       - name: Run custom build script
         if: (inputs.force_build || env.ECR_IMAGE_EXIST == 'false') && hashFiles('.infra/cicd/build.sh') != ''
         run: |
+          echo 'esta es mi imagen ${{ steps.login-ecr.outputs.registry }}/${{ needs.sets-variables.outputs.ECR_REPOSITORY }}'
+          
+      - name: Run custom build script
+        if: (inputs.force_build || env.ECR_IMAGE_EXIST == 'false') && hashFiles('.infra/cicd/build.sh') != ''
+        run: |
           chmod +x .infra/cicd/build.sh
           ./.infra/cicd/build.sh
 
@@ -443,6 +448,8 @@ jobs:
         with:
           context: .
           push: true
+          platforms: linux/amd64
+          provenance: false
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
