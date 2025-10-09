@@ -425,11 +425,11 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ steps.login-ecr.outputs.registry }}/${{ needs.sets-variables.outputs.ECR_REPOSITORY }}
+          images: 170071165762.dkr.ecr.us-east-2.amazonaws.com/cor-shared-us-east-2-ms-notifications # ${{ steps.login-ecr.outputs.registry }}/${{ needs.sets-variables.outputs.ECR_REPOSITORY }}
           tags: |
             type=raw,value=${{ env.RELEASE_VERSION }}
-            type=raw,value=${{ needs.sets-variables.outputs.STAGE }},enable=${{ env.RUN_ENV == 'prod' }}
-            type=raw,value=latest,enable=${{ env.RUN_ENV == 'prod' && needs.sets-variables.outputs.STAGE == 'production' }}
+          #  type=raw,value=${{ needs.sets-variables.outputs.STAGE }},enable=${{ env.RUN_ENV == 'prod' }}
+          #  type=raw,value=latest,enable=${{ env.RUN_ENV == 'prod' && needs.sets-variables.outputs.STAGE == 'production' }}
 
       - name: Run custom build script
         if: (inputs.force_build || env.ECR_IMAGE_EXIST == 'false') && hashFiles('.infra/cicd/build.sh') != ''
