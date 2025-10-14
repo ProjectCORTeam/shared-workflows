@@ -76,7 +76,7 @@ on:
         required: false
       DOCKERHUB_PASSWORD:
         required: false
-      GH_PAT:
+      ACTIONS_TOKEN:
         required: true
         description: "Personal Access Token para acceder a repositorios privados"
 
