@@ -76,7 +76,7 @@ on:
         required: false
       DOCKERHUB_PASSWORD:
         required: false
-      ACTIONS_TOKEN:
+      GH_PAT:
         required: true
         description: "Personal Access Token para acceder a repositorios privados"
 
@@ -111,7 +111,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 1
+          fetch-depth: 0
 
       - id: install-aws-cli
         if: contains( inputs.runner, 'k8s-runners-stg' )
@@ -316,6 +316,7 @@ jobs:
     runs-on: ${{ inputs.runner }}
     name: Docker Build and Push to ECR
     needs: [sets-variables, check-stage]
+    if: always() && (needs.sets-variables.result == 'success' && needs.check-stage.result == 'success')
     outputs:
       release_version: ${{ steps.set-release-version.outputs.RELEASE_VERSION }}
       env_check: ${{ steps.build-complete.outputs.env_check }}
@@ -324,7 +325,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 1
+          fetch-depth: 0
 
       - name: Checkout Infra Templates
         uses: actions/checkout@v4
@@ -332,7 +333,17 @@ jobs:
           repository: ProjectCORTeam/infra-service-templates
           ref: ${{ inputs.infra_templates_version }}
           path: infra-templates
-          token: ${{ secrets.ACTIONS_TOKEN }}
+          token: ${{ secrets.GH_PAT }}
+          fetch-depth: 1
+
+      - name: Cache Node.js dependencies
+        if: hashFiles('package-lock.json') != ''
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
 
       - id: install-aws-cli
         if: contains( inputs.runner, 'k8s-runners-stg' )
@@ -376,7 +387,9 @@ jobs:
           aws ecr describe-images \
             --repository-name ${{ needs.sets-variables.outputs.ECR_REPOSITORY }} \
             --region ${{ secrets.SHARED_AWS_REGION }} \
-            --image-ids imageTag=${{ env.RELEASE_VERSION }}
+            --image-ids imageTag=${{ env.RELEASE_VERSION }} \
+            --query 'imageDetails[0].imagePushedAt' \
+            --output text
 
       - name: Check ECR image tag outcome
         id: check-ecr
@@ -406,6 +419,9 @@ jobs:
       - name: Set up Docker Buildx
         if: inputs.force_build || env.ECR_IMAGE_EXIST == 'false'
         uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: |
+            image=moby/buildkit:buildx-stable-1
 
       - name: Extract Docker metadata
         if: inputs.force_build || env.ECR_IMAGE_EXIST == 'false'
@@ -435,18 +451,23 @@ jobs:
           provenance: false
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: |
+            type=gha
+            type=registry,ref=${{ steps.login-ecr.outputs.registry }}/cor-shared-us-east-2-${{ needs.sets-variables.outputs.SERVICE_TYPE }}-${{ needs.sets-variables.outputs.SERVICE_NAME }}:buildcache
+          cache-to: |
+            type=gha,mode=max
+            type=registry,ref=${{ steps.login-ecr.outputs.registry }}/cor-shared-us-east-2-${{ needs.sets-variables.outputs.SERVICE_TYPE }}-${{ needs.sets-variables.outputs.SERVICE_NAME }}:buildcache,mode=max
           build-args: |
             RELEASE_VERSION=${{ env.RELEASE_VERSION }}
             STAGE=${{ needs.sets-variables.outputs.STAGE }}
             RUN_ENV=${{ env.RUN_ENV }}
 
-      - name: Install Helm
+      - name: Install Helm and Setup ChartMuseum
         if: inputs.force_build || env.ECR_IMAGE_EXIST == 'false'
         uses: azure/setup-helm@v4
         with:
           version: 'v3.14.4'
+        continue-on-error: false
 
       - name: Setup Helm ChartMuseum
         if: inputs.force_build || env.ECR_IMAGE_EXIST == 'false'
@@ -481,7 +502,7 @@ jobs:
 
       - name: Google Chat Notification - Build Success
         if: inputs.notifications && (inputs.force_build || env.ECR_IMAGE_EXIST == 'false')
-        uses: nakamuraos/google-chat-notifications@v2.1.0
+        uses: nakamuraos/google-chat-notifications@v2.2.0
         with:
           title: Image Build Success
           subtitle: ${{ env.RELEASE_VERSION }}
@@ -490,7 +511,7 @@ jobs:
 
       - name: Google Chat Notification - Image Already Exists
         if: inputs.notifications && env.ECR_IMAGE_EXIST == 'true' && !inputs.force_build
-        uses: nakamuraos/google-chat-notifications@v2.1.0
+        uses: nakamuraos/google-chat-notifications@v2.2.0
         with:
           title: Image Build Skipped
           subtitle: ${{ env.RELEASE_VERSION }} already exists
