@@ -298,7 +298,7 @@ jobs:
         shell: bash
         run: |
           # Verificar si existe la configuración para este stage
-          CONFIG_EXISTS=$(aws s3 ls s3://cor-infra-us-east-2-services-configs/${{ github.repository }}-${{ needs.sets-variables.outputs.STAGE }}.json 2>/dev/null || echo "false")
+          CONFIG_EXISTS=$(aws s3 ls s3://cor-infra-us-east-2-services-configs/${{ github.repository }}.json 2>/dev/null || echo "false")
           
           if [[ "$CONFIG_EXISTS" == "false" ]]; then
             echo "new_stage=true"
