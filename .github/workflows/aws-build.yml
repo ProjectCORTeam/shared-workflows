@@ -59,7 +59,7 @@ on:
       CICD_AWS_REGION:
         required: true
       INFRA_AWS_ACCESS_KEY_ID:
-        required: truenotifi
+        required: true
       INFRA_AWS_SECRET_ACCESS_KEY:
         required: true
       INFRA_AWS_REGION:
