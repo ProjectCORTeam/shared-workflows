@@ -111,7 +111,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 1
+
+      - name: Cache AWS CLI
+        if: contains( inputs.runner, 'k8s-runners-stg' )
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/bin/aws
+          key: ${{ runner.os }}-aws-cli-v2
+          restore-keys: |
+            ${{ runner.os }}-aws-cli-
 
       - id: install-aws-cli
         if: contains( inputs.runner, 'k8s-runners-stg' )
@@ -132,8 +141,6 @@ jobs:
         id: sync-infra-config
         run: |
           aws s3 cp s3://cor-infra-us-east-2-services-configs/${{ github.repository }}.json .infra/infra-config.json
-          ls -la .infra/
-          cat .infra/infra-config.json
 
       - name: Get Commit Hash
         id: get-commit-ids
@@ -154,10 +161,9 @@ jobs:
         run: |
           echo "RELEASE_TAG=null" >> $GITHUB_ENV
           echo "RELEASE_TAG=null" >> $GITHUB_OUTPUT
-          tag=$(git describe --exact-match --tags HEAD)
+          tag=$(git describe --exact-match --tags HEAD 2>/dev/null || echo "")
           if [[ -n "$tag" ]]; then
               echo "Current commit has a tag: $tag"
-              echo "RELEASE_TAG=$tag"
               echo "RELEASE_TAG=$tag" >> $GITHUB_ENV
               echo "RELEASE_TAG=$tag" >> $GITHUB_OUTPUT
               echo "RELEASE_VERSION=$tag" >> $GITHUB_ENV
@@ -250,8 +256,14 @@ jobs:
         id: set-project-name
         shell: bash
         run: |
-          SERVICE_NAME=$(jq -r '.name' .infra/infra-config.json)
-          SERVICE_TYPE=$(jq -r '.type // "service"' .infra/infra-config.json)
+          # Verificar si jq está disponible, si no, usar python
+          if command -v jq >/dev/null 2>&1; then
+            SERVICE_NAME=$(jq -r '.name' .infra/infra-config.json)
+            SERVICE_TYPE=$(jq -r '.type // "service"' .infra/infra-config.json)
+          else
+            SERVICE_NAME=$(python3 -c "import json; data=json.load(open('.infra/infra-config.json')); print(data.get('name', ''))")
+            SERVICE_TYPE=$(python3 -c "import json; data=json.load(open('.infra/infra-config.json')); print(data.get('type', 'service'))")
+          fi
           
           echo "SERVICE_NAME=$SERVICE_NAME"
           echo "SERVICE_NAME=$SERVICE_NAME" >> $GITHUB_ENV
@@ -278,6 +290,15 @@ jobs:
       stage_check: ${{ steps.check-stage-config.outputs.stage_check }}
       
     steps:
+      - name: Cache AWS CLI
+        if: contains( inputs.runner, 'k8s-runners-stg' )
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/bin/aws
+          key: ${{ runner.os }}-aws-cli-v2
+          restore-keys: |
+            ${{ runner.os }}-aws-cli-
+
       - id: install-aws-cli
         if: contains( inputs.runner, 'k8s-runners-stg' )
         uses: unfor19/install-aws-cli-action@v1
@@ -325,7 +346,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 1
 
       - name: Checkout Infra Templates
         uses: actions/checkout@v4
@@ -337,13 +358,22 @@ jobs:
           fetch-depth: 1
 
       - name: Cache Node.js dependencies
-        if: hashFiles('package-lock.json') != ''
+        if: hashFiles('package-lock.json') != '' && (inputs.force_build || env.ECR_IMAGE_EXIST == 'false')
         uses: actions/cache@v4
         with:
           path: ~/.npm
           key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
           restore-keys: |
             ${{ runner.os }}-node-
+
+      - name: Cache AWS CLI
+        if: contains( inputs.runner, 'k8s-runners-stg' )
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/bin/aws
+          key: ${{ runner.os }}-aws-cli-v2
+          restore-keys: |
+            ${{ runner.os }}-aws-cli-
 
       - id: install-aws-cli
         if: contains( inputs.runner, 'k8s-runners-stg' )
@@ -389,7 +419,7 @@ jobs:
             --region ${{ secrets.SHARED_AWS_REGION }} \
             --image-ids imageTag=${{ env.RELEASE_VERSION }} \
             --query 'imageDetails[0].imagePushedAt' \
-            --output text
+            --output text >/dev/null 2>&1
 
       - name: Check ECR image tag outcome
         id: check-ecr
@@ -419,9 +449,6 @@ jobs:
       - name: Set up Docker Buildx
         if: inputs.force_build || env.ECR_IMAGE_EXIST == 'false'
         uses: docker/setup-buildx-action@v3
-        with:
-          driver-opts: |
-            image=moby/buildkit:buildx-stable-1
 
       - name: Extract Docker metadata
         if: inputs.force_build || env.ECR_IMAGE_EXIST == 'false'
@@ -451,16 +478,23 @@ jobs:
           provenance: false
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: |
-            type=gha
-            type=registry,ref=${{ steps.login-ecr.outputs.registry }}/cor-shared-us-east-2-${{ needs.sets-variables.outputs.SERVICE_TYPE }}-${{ needs.sets-variables.outputs.SERVICE_NAME }}:buildcache
-          cache-to: |
-            type=gha,mode=max
-            type=registry,ref=${{ steps.login-ecr.outputs.registry }}/cor-shared-us-east-2-${{ needs.sets-variables.outputs.SERVICE_TYPE }}-${{ needs.sets-variables.outputs.SERVICE_NAME }}:buildcache,mode=max
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           build-args: |
             RELEASE_VERSION=${{ env.RELEASE_VERSION }}
             STAGE=${{ needs.sets-variables.outputs.STAGE }}
             RUN_ENV=${{ env.RUN_ENV }}
+
+      - name: Cache Helm
+        if: inputs.force_build || env.ECR_IMAGE_EXIST == 'false'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.local/share/helm
+            ~/.config/helm
+          key: ${{ runner.os }}-helm-v3.14.4
+          restore-keys: |
+            ${{ runner.os }}-helm-
 
       - name: Install Helm and Setup ChartMuseum
         if: inputs.force_build || env.ECR_IMAGE_EXIST == 'false'
@@ -473,7 +507,7 @@ jobs:
         if: inputs.force_build || env.ECR_IMAGE_EXIST == 'false'
         run: |
           helm plugin install https://github.com/chartmuseum/helm-push || true
-          helm repo add cor https://chartmuseum.shared.projectcor.com
+          helm repo add cor https://chartmuseum.shared.projectcor.com || true
           helm repo update
 
       - name: Package and Push Helm Chart
@@ -481,12 +515,12 @@ jobs:
         run: |
           cd infra-templates/templates/simple-service-persistence/simple-eks/kubernetes/service/
           
-          # Reemplazar variables en los templates
-          find . -type f -exec sed -i 's/\$TEMPLATE_SERVICE_NAME/'"${{ needs.sets-variables.outputs.SERVICE_NAME }}"'/g' {} +
-          find . -type f -exec sed -i 's/\$TEMPLATE_SERVICE_TYPE/'"${{ needs.sets-variables.outputs.SERVICE_TYPE }}"'/g' {} +
+          # Reemplazar variables en los templates (más eficiente)
+          sed -i 's/\$TEMPLATE_SERVICE_NAME/'"${{ needs.sets-variables.outputs.SERVICE_NAME }}"'/g' Chart.yaml values.yaml
+          sed -i 's/\$TEMPLATE_SERVICE_TYPE/'"${{ needs.sets-variables.outputs.SERVICE_TYPE }}"'/g' Chart.yaml values.yaml
           
           # Empaquetar y pushear el chart
-          helm package . --version ${{ env.RELEASE_VERSION }} --app-version ${{ env.RELEASE_VERSION }}
+          helm package . --version ${{ env.RELEASE_VERSION }} --app-version ${{ env.RELEASE_VERSION }} --destination .
           helm cm-push ${{ needs.sets-variables.outputs.SERVICE_TYPE }}-${{ needs.sets-variables.outputs.SERVICE_NAME }}-${{ env.RELEASE_VERSION }}.tgz cor -f
 
       - name: Run custom post-build script
