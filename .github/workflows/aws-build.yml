@@ -85,6 +85,7 @@ jobs:
   sets-variables:
     runs-on: ${{ inputs.runner }}
     name: Sets Variables
+    timeout-minutes: 10
     outputs:
       COMMIT_HASH: ${{ steps.get-commit-ids.outputs.COMMIT_HASH }}
       SHORT_COMMIT_HASH: ${{ steps.get-commit-ids.outputs.SHORT_COMMIT_HASH }}
@@ -113,6 +114,15 @@ jobs:
         with:
           fetch-depth: 1
 
+      - name: Cache AWS CLI
+        if: contains( inputs.runner, 'k8s-runners-stg' )
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/bin/aws
+          key: ${{ runner.os }}-aws-cli-v2
+          restore-keys: |
+            ${{ runner.os }}-aws-cli-
+
       - id: install-aws-cli
         if: contains( inputs.runner, 'k8s-runners-stg' )
         uses: unfor19/install-aws-cli-action@v1
@@ -132,8 +142,6 @@ jobs:
         id: sync-infra-config
         run: |
           aws s3 cp s3://cor-infra-us-east-2-services-configs/${{ github.repository }}.json .infra/infra-config.json
-          ls -la .infra/
-          cat .infra/infra-config.json
 
       - name: Get Commit Hash
         id: get-commit-ids
@@ -154,10 +162,9 @@ jobs:
         run: |
           echo "RELEASE_TAG=null" >> $GITHUB_ENV
           echo "RELEASE_TAG=null" >> $GITHUB_OUTPUT
-          tag=$(git describe --exact-match --tags HEAD)
+          tag=$(git describe --exact-match --tags HEAD 2>/dev/null || echo "")
           if [[ -n "$tag" ]]; then
               echo "Current commit has a tag: $tag"
-              echo "RELEASE_TAG=$tag"
               echo "RELEASE_TAG=$tag" >> $GITHUB_ENV
               echo "RELEASE_TAG=$tag" >> $GITHUB_OUTPUT
               echo "RELEASE_VERSION=$tag" >> $GITHUB_ENV
@@ -217,7 +224,7 @@ jobs:
 
       - name: Extract branch name - Gitflow Mode
         id: extract_branch
-        if: contains(fromJson('["push", "release", "pull_request"]'), github.event_name)
+        if: github.event_name == 'push' || github.event_name == 'release' || github.event_name == 'pull_request'
         shell: bash
         run: |
           if [[ "${{ github.event_name }}" == 'pull_request' ]]; then
@@ -237,7 +244,7 @@ jobs:
 
       - name: Set release/branch version - staging
         id: set-release-staging
-        if: contains(fromJson('["workflow_dispatch"]'), inputs.trigger_type)
+        if: inputs.trigger_type == 'workflow_dispatch'
         run: |
           RELEASE_VERSION=${{ inputs.stage }}
           RELEASE_VERSION=$(echo $RELEASE_VERSION | sed s/staging/v/g)
@@ -250,8 +257,14 @@ jobs:
         id: set-project-name
         shell: bash
         run: |
-          SERVICE_NAME=$(jq -r '.name' .infra/infra-config.json)
-          SERVICE_TYPE=$(jq -r '.type // "service"' .infra/infra-config.json)
+          # Verificar si jq está disponible, si no, usar python
+          if command -v jq >/dev/null 2>&1; then
+            SERVICE_NAME=$(jq -r '.name' .infra/infra-config.json)
+            SERVICE_TYPE=$(jq -r '.type // "service"' .infra/infra-config.json)
+          else
+            SERVICE_NAME=$(python3 -c "import json; data=json.load(open('.infra/infra-config.json')); print(data.get('name', ''))")
+            SERVICE_TYPE=$(python3 -c "import json; data=json.load(open('.infra/infra-config.json')); print(data.get('type', 'service'))")
+          fi
           
           echo "SERVICE_NAME=$SERVICE_NAME"
           echo "SERVICE_NAME=$SERVICE_NAME" >> $GITHUB_ENV
@@ -273,11 +286,21 @@ jobs:
     runs-on: ${{ inputs.runner }}
     name: Check Stage Configuration
     needs: sets-variables
+    timeout-minutes: 5
     outputs:
       new_stage: ${{ steps.check-stage-config.outputs.new_stage }}
       stage_check: ${{ steps.check-stage-config.outputs.stage_check }}
       
     steps:
+      - name: Cache AWS CLI
+        if: contains( inputs.runner, 'k8s-runners-stg' )
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/bin/aws
+          key: ${{ runner.os }}-aws-cli-v2
+          restore-keys: |
+            ${{ runner.os }}-aws-cli-
+
       - id: install-aws-cli
         if: contains( inputs.runner, 'k8s-runners-stg' )
         uses: unfor19/install-aws-cli-action@v1
@@ -316,6 +339,8 @@ jobs:
     runs-on: ${{ inputs.runner }}
     name: Docker Build and Push to ECR
     needs: [sets-variables, check-stage]
+    if: always() && (needs.sets-variables.result == 'success' && needs.check-stage.result == 'success')
+    #timeout-minutes: 60
     outputs:
       release_version: ${{ steps.set-release-version.outputs.RELEASE_VERSION }}
       env_check: ${{ steps.build-complete.outputs.env_check }}
@@ -333,6 +358,25 @@ jobs:
           ref: ${{ inputs.infra_templates_version }}
           path: infra-templates
           token: ${{ secrets.ACTIONS_TOKEN }}
+          fetch-depth: 1
+
+      - name: Cache Node.js dependencies
+        if: hashFiles('package-lock.json') != '' && (inputs.force_build || env.ECR_IMAGE_EXIST == 'false')
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Cache AWS CLI
+        if: contains( inputs.runner, 'k8s-runners-stg' )
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/bin/aws
+          key: ${{ runner.os }}-aws-cli-v2
+          restore-keys: |
+            ${{ runner.os }}-aws-cli-
 
       - id: install-aws-cli
         if: contains( inputs.runner, 'k8s-runners-stg' )
@@ -376,7 +420,9 @@ jobs:
           aws ecr describe-images \
             --repository-name ${{ needs.sets-variables.outputs.ECR_REPOSITORY }} \
             --region ${{ secrets.SHARED_AWS_REGION }} \
-            --image-ids imageTag=${{ env.RELEASE_VERSION }}
+            --image-ids imageTag=${{ env.RELEASE_VERSION }} \
+            --query 'imageDetails[0].imagePushedAt' \
+            --output text >/dev/null 2>&1 || exit 1
 
       - name: Check ECR image tag outcome
         id: check-ecr
@@ -441,18 +487,31 @@ jobs:
             RELEASE_VERSION=${{ env.RELEASE_VERSION }}
             STAGE=${{ needs.sets-variables.outputs.STAGE }}
             RUN_ENV=${{ env.RUN_ENV }}
+          outputs: type=registry
 
-      - name: Install Helm
+      - name: Cache Helm
+        if: inputs.force_build || env.ECR_IMAGE_EXIST == 'false'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.local/share/helm
+            ~/.config/helm
+          key: ${{ runner.os }}-helm-v3.14.4
+          restore-keys: |
+            ${{ runner.os }}-helm-
+
+      - name: Install Helm and Setup ChartMuseum
         if: inputs.force_build || env.ECR_IMAGE_EXIST == 'false'
         uses: azure/setup-helm@v4
         with:
           version: 'v3.14.4'
+        continue-on-error: false
 
       - name: Setup Helm ChartMuseum
         if: inputs.force_build || env.ECR_IMAGE_EXIST == 'false'
         run: |
           helm plugin install https://github.com/chartmuseum/helm-push || true
-          helm repo add cor https://chartmuseum.shared.projectcor.com
+          helm repo add cor https://chartmuseum.shared.projectcor.com || true
           helm repo update
 
       - name: Package and Push Helm Chart
@@ -460,12 +519,12 @@ jobs:
         run: |
           cd infra-templates/templates/simple-service-persistence/simple-eks/kubernetes/service/
           
-          # Reemplazar variables en los templates
-          find . -type f -exec sed -i 's/\$TEMPLATE_SERVICE_NAME/'"${{ needs.sets-variables.outputs.SERVICE_NAME }}"'/g' {} +
-          find . -type f -exec sed -i 's/\$TEMPLATE_SERVICE_TYPE/'"${{ needs.sets-variables.outputs.SERVICE_TYPE }}"'/g' {} +
+          # Reemplazar variables en los templates (más eficiente)
+          sed -i 's/\$TEMPLATE_SERVICE_NAME/'"${{ needs.sets-variables.outputs.SERVICE_NAME }}"'/g' Chart.yaml values.yaml
+          sed -i 's/\$TEMPLATE_SERVICE_TYPE/'"${{ needs.sets-variables.outputs.SERVICE_TYPE }}"'/g' Chart.yaml values.yaml
           
           # Empaquetar y pushear el chart
-          helm package . --version ${{ env.RELEASE_VERSION }} --app-version ${{ env.RELEASE_VERSION }}
+          helm package . --version ${{ env.RELEASE_VERSION }} --app-version ${{ env.RELEASE_VERSION }} --destination .
           helm cm-push ${{ needs.sets-variables.outputs.SERVICE_TYPE }}-${{ needs.sets-variables.outputs.SERVICE_NAME }}-${{ env.RELEASE_VERSION }}.tgz cor -f
 
       - name: Run custom post-build script
@@ -481,7 +540,7 @@ jobs:
 
       - name: Google Chat Notification - Build Success
         if: inputs.notifications && (inputs.force_build || env.ECR_IMAGE_EXIST == 'false')
-        uses: nakamuraos/google-chat-notifications@v2.1.0
+        uses: nakamuraos/google-chat-notifications@v2.2.0
         with:
           title: Image Build Success
           subtitle: ${{ env.RELEASE_VERSION }}
@@ -490,7 +549,7 @@ jobs:
 
       - name: Google Chat Notification - Image Already Exists
         if: inputs.notifications && env.ECR_IMAGE_EXIST == 'true' && !inputs.force_build
-        uses: nakamuraos/google-chat-notifications@v2.1.0
+        uses: nakamuraos/google-chat-notifications@v2.2.0
         with:
           title: Image Build Skipped
           subtitle: ${{ env.RELEASE_VERSION }} already exists
@@ -508,3 +567,4 @@ jobs:
           echo "- **ECR Repository:** ${{ needs.sets-variables.outputs.ECR_REPOSITORY }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Image Already Exists:** ${{ env.ECR_IMAGE_EXIST }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Build Forced:** ${{ inputs.force_build }}" >> $GITHUB_STEP_SUMMARY
+          
