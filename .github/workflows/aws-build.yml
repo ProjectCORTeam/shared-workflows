@@ -441,6 +441,12 @@ jobs:
             RELEASE_VERSION=${{ env.RELEASE_VERSION }}
             STAGE=${{ needs.sets-variables.outputs.STAGE }}
             RUN_ENV=${{ env.RUN_ENV }}
+            ${{
+              secrets.POETRY_HTTP_BASIC_GITHUB_USERNAME && format('POETRY_HTTP_BASIC_GITHUB_USERNAME={0}', secrets.POETRY_HTTP_BASIC_GITHUB_USERNAME) || ''
+            }}
+            ${{
+              secrets.POETRY_HTTP_BASIC_GITHUB_PASSWORD && format('POETRY_HTTP_BASIC_GITHUB_PASSWORD={0}', secrets.POETRY_HTTP_BASIC_GITHUB_PASSWORD) || ''
+            }}
 
       - name: Install Helm
         if: inputs.force_build || env.ECR_IMAGE_EXIST == 'false'
