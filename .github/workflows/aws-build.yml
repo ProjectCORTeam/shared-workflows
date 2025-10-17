@@ -84,6 +84,8 @@ jobs:
 
   sets-variables:
     runs-on: ${{ inputs.runner }}
+    environment:
+      name: ${{ inputs.stage }}
     name: Sets Variables
     outputs:
       COMMIT_HASH: ${{ steps.get-commit-ids.outputs.COMMIT_HASH }}
@@ -97,7 +99,6 @@ jobs:
       PROJECT: ${{ steps.set-project-name.outputs.PROJECT }}
       ECR_REPOSITORY: ${{ steps.set-project-name.outputs.ECR_REPOSITORY }}
     steps:   
-
       - name: Check Inputs
         id: check-inputs
         run: |
@@ -271,6 +272,8 @@ jobs:
 
   check-stage:
     runs-on: ${{ inputs.runner }}
+    environment:
+      name: ${{ inputs.stage }}
     name: Check Stage Configuration
     needs: sets-variables
     outputs:
@@ -314,6 +317,8 @@ jobs:
 
   docker-build-push:
     runs-on: ${{ inputs.runner }}
+    environment:
+      name: ${{ inputs.stage }} 
     name: Docker Build and Push to ECR
     needs: [sets-variables, check-stage]
     outputs:

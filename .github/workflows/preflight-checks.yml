@@ -19,7 +19,8 @@ on:
 jobs:
   check_user_group:
     runs-on: ubuntu-latest
-
+    environment:
+      name: ${{ inputs.stage }}
     steps:
       - name: Verify user membership
         id: check_group_membership

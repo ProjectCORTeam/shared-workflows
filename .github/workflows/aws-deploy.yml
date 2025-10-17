@@ -68,7 +68,9 @@ on:
 jobs:
   helm:
     name: Helm
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner }}
+    environment:
+      name: ${{ inputs.stage }}
     steps: 
       - name: Configure AWS Credentials - INFRA
         uses: aws-actions/configure-aws-credentials@v4
@@ -139,274 +141,276 @@ jobs:
             --version ${{ inputs.release_version }} \
             --namespace $K8S_NAMESPACE --atomic --reuse-values --timeout 5m
   terraform:
-      name: "Terraform"
-      runs-on: ${{ inputs.runner }}
-      if: false
-      steps:
-        - name: Cache Terraform files
-          uses: actions/cache@v4
-          with:
-            path: |
-              .infra/terraform/.terraform
-            key: terraform-${{ inputs.stage }}
+    name: "Terraform"
+    runs-on: ${{ inputs.runner }}
+    environment:
+      name: ${{ inputs.stage }}
+    if: false
+    steps:
+      - name: Cache Terraform files
+        uses: actions/cache@v4
+        with:
+          path: |
+            .infra/terraform/.terraform
+          key: terraform-${{ inputs.stage }}
 
-        - id: install-aws-cli
-          if: contains( inputs.runner, 'k8s-runners-stg' )
-          uses: unfor19/install-aws-cli-action@v1
-          with:
-            version: 2     # default
-            verbose: false # default
-            arch: amd64    # allowed values: amd64, arm64
+      - id: install-aws-cli
+        if: contains( inputs.runner, 'k8s-runners-stg' )
+        uses: unfor19/install-aws-cli-action@v1
+        with:
+          version: 2     # default
+          verbose: false # default
+          arch: amd64    # allowed values: amd64, arm64
 
-        - name: Install Terraform
-          if: contains( inputs.runner, 'k8s-runners-stg' )
-          uses: little-core-labs/install-terraform@v2.0.0
-          with:
-              version: ${{ inputs.infra_terraform_version }}
+      - name: Install Terraform
+        if: contains( inputs.runner, 'k8s-runners-stg' )
+        uses: little-core-labs/install-terraform@v2.0.0
+        with:
+            version: ${{ inputs.infra_terraform_version }}
 
-        - uses: actions/setup-node@v4
-          with:
-            node-version: 18
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
 
-        - name: Setup Terraform
-          shell: bash
-          run: |
-            cat >~/.terraformrc <<EOL
-            credentials "app.terraform.io" {
-              token = "${{ secrets.TF_API_TOKEN }}"
-            }
-            EOL
-            #echo "TF_PLUGIN_CACHE_DIR=$HOME/.terraform.d/plugin-cache" >>"$GITHUB_ENV"
-            #mkdir --parents "$HOME/.terraform.d/plugin-cache"
+      - name: Setup Terraform
+        shell: bash
+        run: |
+          cat >~/.terraformrc <<EOL
+          credentials "app.terraform.io" {
+            token = "${{ secrets.TF_API_TOKEN }}"
+          }
+          EOL
+          #echo "TF_PLUGIN_CACHE_DIR=$HOME/.terraform.d/plugin-cache" >>"$GITHUB_ENV"
+          #mkdir --parents "$HOME/.terraform.d/plugin-cache"
 
-        - name: Import Templates
-          uses: actions/checkout@v4
-          with:
-            repository: ProjectCORTeam/infra-service-templates
-            ref: ${{ inputs.infra_templates_version }}
-            path: infra-templates
-            token: ${{ secrets.ACTIONS_TOKEN }}
-            sparse-checkout: |
-              templates
-            fetch-depth: 1
+      - name: Import Templates
+        uses: actions/checkout@v4
+        with:
+          repository: ProjectCORTeam/infra-service-templates
+          ref: ${{ inputs.infra_templates_version }}
+          path: infra-templates
+          token: ${{ secrets.ACTIONS_TOKEN }}
+          sparse-checkout: |
+            templates
+          fetch-depth: 1
 
-        - name: Import service infra config
-          uses: actions/checkout@v4
-          with:
-            path: infra-config
-            sparse-checkout: |
-              .infra/
-            fetch-depth: 1
+      - name: Import service infra config
+        uses: actions/checkout@v4
+        with:
+          path: infra-config
+          sparse-checkout: |
+            .infra/
+          fetch-depth: 1
 
-        - name: Configure AWS Credentials - INFRA
-          uses: aws-actions/configure-aws-credentials@v1
-          with:
-            aws-access-key-id: ${{ secrets.INFRA_AWS_ACCESS_KEY_ID }}
-            aws-secret-access-key: ${{ secrets.INFRA_AWS_SECRET_ACCESS_KEY }}
-            aws-region: ${{ secrets.INFRA_AWS_REGION }}
-    
-        - name: Sync infra config 
-          id: sync-infra-config
-          run: |
-            aws s3 cp s3://cor-infra-us-east-2-services-configs/${{ github.repository }}.json ./infra-config/.infra/infra-config.json
+      - name: Configure AWS Credentials - INFRA
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.INFRA_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.INFRA_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.INFRA_AWS_REGION }}
+  
+      - name: Sync infra config 
+        id: sync-infra-config
+        run: |
+          aws s3 cp s3://cor-infra-us-east-2-services-configs/${{ github.repository }}.json ./infra-config/.infra/infra-config.json
 
-        - name: Setup Infra service files
-          shell: bash
-          run: |
+      - name: Setup Infra service files
+        shell: bash
+        run: |
 
-            if [ ! -d ".infra" ]; then
-              mkdir .infra
-            fi
+          if [ ! -d ".infra" ]; then
+            mkdir .infra
+          fi
+        
+          cp ./infra-config/.infra/infra-config.json .infra/infra-config.json
+
+          SERVICE_NAME=$(jq -r '.name' .infra/infra-config.json)  
+          INFRA_TYPE=$(jq -r '.deployment_type' .infra/infra-config.json | tr '[:upper:]' '[:lower:]')
+          SERVICE_TYPE=$(jq -r '.type' .infra/infra-config.json)  
+          SERVICE_OWNER=$(jq -r '.owner_team' .infra/infra-config.json)  
           
-            cp ./infra-config/.infra/infra-config.json .infra/infra-config.json
+          echo -e "\033[32mSincronizando archivos...........\033[0m"
+          # rsync -av --progress ./infra-templates/templates/simple-service-persistence/base/* .infra 
+          rsync -av --progress ./infra-templates/templates/simple-service-persistence/simple-$INFRA_TYPE/* .infra --exclude infra-config.json
+        
+          echo -e "\033[32mOverride terraform files...........\033[0m"
+          rsync -av --progress ./infra-config/.infra/* .infra --exclude infra-config.json
 
-            SERVICE_NAME=$(jq -r '.name' .infra/infra-config.json)  
-            INFRA_TYPE=$(jq -r '.deployment_type' .infra/infra-config.json | tr '[:upper:]' '[:lower:]')
-            SERVICE_TYPE=$(jq -r '.type' .infra/infra-config.json)  
-            SERVICE_OWNER=$(jq -r '.owner_team' .infra/infra-config.json)  
-            
-            echo -e "\033[32mSincronizando archivos...........\033[0m"
-            # rsync -av --progress ./infra-templates/templates/simple-service-persistence/base/* .infra 
-            rsync -av --progress ./infra-templates/templates/simple-service-persistence/simple-$INFRA_TYPE/* .infra --exclude infra-config.json
-          
-            echo -e "\033[32mOverride terraform files...........\033[0m"
-            rsync -av --progress ./infra-config/.infra/* .infra --exclude infra-config.json
+          cp -a ./infra-templates/templates/simple-service-persistence/base/* .infra/
+          #find ./infra-templates/templates/simple-service-persistence/simple-$INFRA_TYPE/ -type f ! -name 'infra-config.json' -exec cp {} .infra/ \;
 
-            cp -a ./infra-templates/templates/simple-service-persistence/base/* .infra/
-            #find ./infra-templates/templates/simple-service-persistence/simple-$INFRA_TYPE/ -type f ! -name 'infra-config.json' -exec cp {} .infra/ \;
+          echo -e "\033[32mConfigurando archivos...........033[0m"
+          find ./ -type f -exec sed -i "s/\$TEMPLATE_SERVICE_TYPE/$SERVICE_TYPE/g" {} +
+          find ./ -type f -exec sed -i "s/\$TEMPLATE_SERVICE_NAME/$SERVICE_NAME/g" {} +
+          find ./ -type f -exec sed -i "s/\$TEMPLATE_SERVICE_OWNER_TEAM/$SERVICE_OWNER/g" {} +
 
-            echo -e "\033[32mConfigurando archivos...........033[0m"
-            find ./ -type f -exec sed -i "s/\$TEMPLATE_SERVICE_TYPE/$SERVICE_TYPE/g" {} +
-            find ./ -type f -exec sed -i "s/\$TEMPLATE_SERVICE_NAME/$SERVICE_NAME/g" {} +
-            find ./ -type f -exec sed -i "s/\$TEMPLATE_SERVICE_OWNER_TEAM/$SERVICE_OWNER/g" {} +
+      - name: Input checks
+        shell: bash
+        run: |
+          echo "github_event: "${{github.event_name }}
+          echo "github_branch: "${{github.ref}}
+          echo "runner: "${{ inputs.runner }}
+          echo "new_stage: "${{ inputs.new_stage }}
+          echo "stage: "${{inputs.stage}}
+          echo "release_version: "${{inputs.release_version}}
 
-        - name: Input checks
-          shell: bash
-          run: |
-            echo "github_event: "${{github.event_name }}
-            echo "github_branch: "${{github.ref}}
-            echo "runner: "${{ inputs.runner }}
-            echo "new_stage: "${{ inputs.new_stage }}
-            echo "stage: "${{inputs.stage}}
-            echo "release_version: "${{inputs.release_version}}
+      - name: Configure AWS Credentials - Terraform
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.TF_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.TF_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.TF_AWS_REGION }}
 
-        - name: Configure AWS Credentials - Terraform
-          uses: aws-actions/configure-aws-credentials@v4
-          with:
-            aws-access-key-id: ${{ secrets.TF_AWS_ACCESS_KEY_ID }}
-            aws-secret-access-key: ${{ secrets.TF_AWS_SECRET_ACCESS_KEY }}
-            aws-region: ${{ secrets.TF_AWS_REGION }}
+      - name: Set Global Terraform Variables
+        shell: bash
+        run: |
+          export TF_VAR_account_id_list='${{secrets.TF_VAR_ACCOUNT_ID_LIST}}'
+          export TF_VAR_terraform_role_name="${{secrets.TF_VAR_TERRAFORM_ROLE_NAME}}"
+          export TF_VAR_github_token="${{secrets.TF_VAR_GITHUB_TOKEN}}"
+          echo TF_VAR_account_id_list
+          echo TF_VAR_terraform_role_name
 
-        - name: Set Global Terraform Variables
-          shell: bash
-          run: |
-            export TF_VAR_account_id_list='${{secrets.TF_VAR_ACCOUNT_ID_LIST}}'
-            export TF_VAR_terraform_role_name="${{secrets.TF_VAR_TERRAFORM_ROLE_NAME}}"
-            export TF_VAR_github_token="${{secrets.TF_VAR_GITHUB_TOKEN}}"
-            echo TF_VAR_account_id_list
-            echo TF_VAR_terraform_role_name
-
-        - name: Generate terraform.auto.tfvars for environment
-          id: tfvars_generator
-          shell: bash
-          working-directory: .infra
-          run: |
-            if [ ${{inputs.STAGE}} == 'production' ] || [ ${{inputs.STAGE}} == 'beta' ]; then \
-              #jq --argjson new_env '{"new_env": ${{ inputs.new_stage }}' --arg commit_id "${GITHUB_SHA::7}" --arg version ${{inputs.release_version}} '.commit_id += $commit_id | (.env_settings[]) += {new_env: false} | .env_settings |= map(if .stage == "${{inputs.STAGE}}" then . += $new_env + {release_version: $version} else . end)' infra-config.json > ./terraform/terraform.auto.tfvars.json              
-              jq --arg new_env "${{ inputs.new_stage }}" \
-                  --arg commit_id "${GITHUB_SHA::7}" \
-                  --arg version "${{ inputs.release_version }}" \
-                  '.commit_id += $commit_id | 
-                    .env_settings[] += {"new_env": false} | 
-                    .env_settings |= map(if .stage == "${{inputs.STAGE}}" then . += {"new_env": $new_env, "release_version": $version} else . end)' \
-                  infra-config.json > ./terraform/terraform.auto.tfvars.json
-            else \
-              #jq --argjson new_env '{"new_env": ${{ inputs.new_stage }}' --arg commit_id "$(git rev-parse --short HEAD)" '.commit_id += $commit_id | (.env_settings[]) += {new_env: false} | .env_settings |= map(if .stage == "${{inputs.STAGE}}" then . += $new_env else . end)' infra-config.json > ./terraform/terraform.auto.tfvars.json
-              jq --arg new_env "${{ inputs.new_stage }}" \
+      - name: Generate terraform.auto.tfvars for environment
+        id: tfvars_generator
+        shell: bash
+        working-directory: .infra
+        run: |
+          if [ ${{inputs.STAGE}} == 'production' ] || [ ${{inputs.STAGE}} == 'beta' ]; then \
+            #jq --argjson new_env '{"new_env": ${{ inputs.new_stage }}' --arg commit_id "${GITHUB_SHA::7}" --arg version ${{inputs.release_version}} '.commit_id += $commit_id | (.env_settings[]) += {new_env: false} | .env_settings |= map(if .stage == "${{inputs.STAGE}}" then . += $new_env + {release_version: $version} else . end)' infra-config.json > ./terraform/terraform.auto.tfvars.json              
+            jq --arg new_env "${{ inputs.new_stage }}" \
                 --arg commit_id "${GITHUB_SHA::7}" \
-                '.commit_id = $commit_id | 
-                  .env_settings[] += {"new_env": $new_env} | 
-                  .env_settings |= map(.new_env = false)' \
+                --arg version "${{ inputs.release_version }}" \
+                '.commit_id += $commit_id | 
+                  .env_settings[] += {"new_env": false} | 
+                  .env_settings |= map(if .stage == "${{inputs.STAGE}}" then . += {"new_env": $new_env, "release_version": $version} else . end)' \
                 infra-config.json > ./terraform/terraform.auto.tfvars.json
-            fi
-            terraform fmt
-            cat ./terraform/terraform.auto.tfvars.json
+          else \
+            #jq --argjson new_env '{"new_env": ${{ inputs.new_stage }}' --arg commit_id "$(git rev-parse --short HEAD)" '.commit_id += $commit_id | (.env_settings[]) += {new_env: false} | .env_settings |= map(if .stage == "${{inputs.STAGE}}" then . += $new_env else . end)' infra-config.json > ./terraform/terraform.auto.tfvars.json
+            jq --arg new_env "${{ inputs.new_stage }}" \
+              --arg commit_id "${GITHUB_SHA::7}" \
+              '.commit_id = $commit_id | 
+                .env_settings[] += {"new_env": $new_env} | 
+                .env_settings |= map(.new_env = false)' \
+              infra-config.json > ./terraform/terraform.auto.tfvars.json
+          fi
+          terraform fmt
+          cat ./terraform/terraform.auto.tfvars.json
 
-        - name: Setup Terraform
-          uses: hashicorp/setup-terraform@v3.0.0
-          with:
-            terraform_version: ${{ inputs.infra_terraform_version }}
-            cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3.0.0
+        with:
+          terraform_version: ${{ inputs.infra_terraform_version }}
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
 
-        - name: Terraform Format
-          id: fmt
-          run: |
-            terraform fmt -check -recursive -diff
-          working-directory: ${{ github.workspace	}}/.infra/terraform
+      - name: Terraform Format
+        id: fmt
+        run: |
+          terraform fmt -check -recursive -diff
+        working-directory: ${{ github.workspace	}}/.infra/terraform
 
-        - name: Terraform Init
-          id: init
-          run: terraform init                    
-          working-directory: ${{ github.workspace	}}/.infra/terraform
-        
-        - name: Terraform Validate
-          id: validate
-          run: terraform validate -no-color
-          working-directory: .infra/terraform
+      - name: Terraform Init
+        id: init
+        run: terraform init                    
+        working-directory: ${{ github.workspace	}}/.infra/terraform
+      
+      - name: Terraform Validate
+        id: validate
+        run: terraform validate -no-color
+        working-directory: .infra/terraform
 
-        - name: Terraform Apply Staging
-          if: ${{ !contains(fromJSON('["production", "beta"]'), inputs.stage) }}
-          id: infra-apply-staging
-          run: |
-            terraform apply -auto-approve -input=false \
-            -target='module.shared' \
-            -target='module.staging["${{ inputs.stage }}"]' \
-            -var="account_id_list=${{secrets.TF_VAR_ACCOUNT_ID_LIST}}" \
-            -var="terraform_role_name=${{secrets.TF_VAR_TERRAFORM_ROLE_NAME}}" \
-            -var="github_token=${{secrets.TF_VAR_GITHUB_TOKEN}}"
-          working-directory: .infra/terraform
+      - name: Terraform Apply Staging
+        if: ${{ !contains(fromJSON('["production", "beta"]'), inputs.stage) }}
+        id: infra-apply-staging
+        run: |
+          terraform apply -auto-approve -input=false \
+          -target='module.shared' \
+          -target='module.staging["${{ inputs.stage }}"]' \
+          -var="account_id_list=${{secrets.TF_VAR_ACCOUNT_ID_LIST}}" \
+          -var="terraform_role_name=${{secrets.TF_VAR_TERRAFORM_ROLE_NAME}}" \
+          -var="github_token=${{secrets.TF_VAR_GITHUB_TOKEN}}"
+        working-directory: .infra/terraform
 
-        - name: Google Chat Notification - Staging
-          if: ${{ !contains(fromJSON('["production", "beta"]'), inputs.stage) }}
-          uses: nakamuraos/google-chat-notifications@v2.1.0
-          with:
-            title: Infrastructure Apply
-            subtitle: Staging - ${{ inputs.stage }}
-            webhookUrl: ${{ secrets.GOOGLE_WEBHOOK }}
-            status: ${{ steps.infra-apply-staging.outcome }}
+      - name: Google Chat Notification - Staging
+        if: ${{ !contains(fromJSON('["production", "beta"]'), inputs.stage) }}
+        uses: nakamuraos/google-chat-notifications@v2.1.0
+        with:
+          title: Infrastructure Apply
+          subtitle: Staging - ${{ inputs.stage }}
+          webhookUrl: ${{ secrets.GOOGLE_WEBHOOK }}
+          status: ${{ steps.infra-apply-staging.outcome }}
 
-        - name: Terraform Plan Beta
-          if: contains( inputs.stage, 'beta' ) && inputs.only_plan
-          id: plan-beta
-          run: |
-            terraform plan -no-color -input=false \
-            -target='module.shared' \
-            -target='module.prod["beta"]' \
-            -var="account_id_list=${{secrets.TF_VAR_ACCOUNT_ID_LIST}}" \
-            -var="terraform_role_name=${{secrets.TF_VAR_TERRAFORM_ROLE_NAME}}" \
-            -var="github_token=${{secrets.TF_VAR_GITHUB_TOKEN}}"
-          continue-on-error: true
-          working-directory: .infra/terraform
-        
-        - name: Terraform Plan Prod
-          if: contains( inputs.stage, 'production' ) && inputs.only_plan
-          id: plan-prod
-          run: | 
-            terraform plan -no-color -input=false \
-            -target='module.shared' \
-            -target='module.prod["production"]' \
-            -var="account_id_list=${{secrets.TF_VAR_ACCOUNT_ID_LIST}}" \
-            -var="terraform_role_name=${{secrets.TF_VAR_TERRAFORM_ROLE_NAME}}" \
-            -var="github_token=${{secrets.TF_VAR_GITHUB_TOKEN}}"
-          continue-on-error: true
-          working-directory: .infra/terraform
+      - name: Terraform Plan Beta
+        if: contains( inputs.stage, 'beta' ) && inputs.only_plan
+        id: plan-beta
+        run: |
+          terraform plan -no-color -input=false \
+          -target='module.shared' \
+          -target='module.prod["beta"]' \
+          -var="account_id_list=${{secrets.TF_VAR_ACCOUNT_ID_LIST}}" \
+          -var="terraform_role_name=${{secrets.TF_VAR_TERRAFORM_ROLE_NAME}}" \
+          -var="github_token=${{secrets.TF_VAR_GITHUB_TOKEN}}"
+        continue-on-error: true
+        working-directory: .infra/terraform
+      
+      - name: Terraform Plan Prod
+        if: contains( inputs.stage, 'production' ) && inputs.only_plan
+        id: plan-prod
+        run: | 
+          terraform plan -no-color -input=false \
+          -target='module.shared' \
+          -target='module.prod["production"]' \
+          -var="account_id_list=${{secrets.TF_VAR_ACCOUNT_ID_LIST}}" \
+          -var="terraform_role_name=${{secrets.TF_VAR_TERRAFORM_ROLE_NAME}}" \
+          -var="github_token=${{secrets.TF_VAR_GITHUB_TOKEN}}"
+        continue-on-error: true
+        working-directory: .infra/terraform
 
-        - name: Terraform Plan Beta Status
-          if: steps.plan-beta.outcome == 'failure'
-          run: exit 1
-        
-        - name: Terraform Plan Prod Status
-          if: steps.plan-prod.outcome == 'failure'
-          run: exit 1
+      - name: Terraform Plan Beta Status
+        if: steps.plan-beta.outcome == 'failure'
+        run: exit 1
+      
+      - name: Terraform Plan Prod Status
+        if: steps.plan-prod.outcome == 'failure'
+        run: exit 1
 
-        - name: Terraform Apply Beta
-          if: inputs.stage == 'beta' && !inputs.only_plan
-          id: infra-apply-beta
-          run: |
-            terraform apply -auto-approve -input=false \
-            -target='module.shared' \
-            -target='module.prod["beta"]' \
-            -var="account_id_list=${{secrets.TF_VAR_ACCOUNT_ID_LIST}}" \
-            -var="terraform_role_name=${{secrets.TF_VAR_TERRAFORM_ROLE_NAME}}" \
-            -var="github_token=${{secrets.TF_VAR_GITHUB_TOKEN}}"        
-          working-directory: .infra/terraform
+      - name: Terraform Apply Beta
+        if: inputs.stage == 'beta' && !inputs.only_plan
+        id: infra-apply-beta
+        run: |
+          terraform apply -auto-approve -input=false \
+          -target='module.shared' \
+          -target='module.prod["beta"]' \
+          -var="account_id_list=${{secrets.TF_VAR_ACCOUNT_ID_LIST}}" \
+          -var="terraform_role_name=${{secrets.TF_VAR_TERRAFORM_ROLE_NAME}}" \
+          -var="github_token=${{secrets.TF_VAR_GITHUB_TOKEN}}"        
+        working-directory: .infra/terraform
 
-        - name: Terraform Apply Prod
-          if: inputs.stage == 'production' && !inputs.only_plan
-          id: infra-apply-production
-          run: | 
-            terraform apply -auto-approve -input=false \
-            -target='module.shared' \
-            -target='module.prod["production"]'  \
-            -var="account_id_list=${{secrets.TF_VAR_ACCOUNT_ID_LIST}}" \
-            -var="terraform_role_name=${{secrets.TF_VAR_TERRAFORM_ROLE_NAME}}" \
-            -var="github_token=${{secrets.TF_VAR_GITHUB_TOKEN}}"
-          working-directory: .infra/terraform
+      - name: Terraform Apply Prod
+        if: inputs.stage == 'production' && !inputs.only_plan
+        id: infra-apply-production
+        run: | 
+          terraform apply -auto-approve -input=false \
+          -target='module.shared' \
+          -target='module.prod["production"]'  \
+          -var="account_id_list=${{secrets.TF_VAR_ACCOUNT_ID_LIST}}" \
+          -var="terraform_role_name=${{secrets.TF_VAR_TERRAFORM_ROLE_NAME}}" \
+          -var="github_token=${{secrets.TF_VAR_GITHUB_TOKEN}}"
+        working-directory: .infra/terraform
 
-        # - name: Google Chat Notification - Beta
-        #   if: inputs.stage == 'beta'
-        #   uses: nakamuraos/google-chat-notifications@v2.1.0
-        #   with:
-        #     title: Infrastructure Apply
-        #     subtitle: ${{ inputs.stage }}
-        #     webhookUrl: ${{ secrets.GOOGLE_WEBHOOK }}
-        #     status: ${{ steps.infra-apply-beta.outcome }}
+      # - name: Google Chat Notification - Beta
+      #   if: inputs.stage == 'beta'
+      #   uses: nakamuraos/google-chat-notifications@v2.1.0
+      #   with:
+      #     title: Infrastructure Apply
+      #     subtitle: ${{ inputs.stage }}
+      #     webhookUrl: ${{ secrets.GOOGLE_WEBHOOK }}
+      #     status: ${{ steps.infra-apply-beta.outcome }}
 
-        # - name: Google Chat Notification - Production
-        #   if: inputs.stage == 'production'
-        #   uses: nakamuraos/google-chat-notifications@v2.1.0
-        #   with:
-        #     title: Infrastructure Apply
-        #     subtitle: ${{ inputs.stage }}
-        #     webhookUrl: ${{ secrets.GOOGLE_WEBHOOK }}
-        #     status: ${{ steps.infra-apply-production.outcome }}
+      # - name: Google Chat Notification - Production
+      #   if: inputs.stage == 'production'
+      #   uses: nakamuraos/google-chat-notifications@v2.1.0
+      #   with:
+      #     title: Infrastructure Apply
+      #     subtitle: ${{ inputs.stage }}
+      #     webhookUrl: ${{ secrets.GOOGLE_WEBHOOK }}
+      #     status: ${{ steps.infra-apply-production.outcome }}
