@@ -79,6 +79,11 @@ jobs:
           aws-secret-access-key: ${{ secrets.INFRA_AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.INFRA_AWS_REGION }}
 
+        # 🔧 Agregar esto para debuggear
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
+
+
       - name: Sync infra config 
         id: sync-infra-config
         run: |
