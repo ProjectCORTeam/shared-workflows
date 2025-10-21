@@ -84,7 +84,9 @@ jobs:
         run: |
           mkdir -p infra-config/.infra
           aws s3 cp s3://cor-infra-us-east-2-services-configs/${{ github.repository }}.json ./infra-config/.infra/infra-config.json
-
+          aws s3 ls
+          echo "Repository: ${{ github.repository }}"
+          
       - name: Configure AWS Credentials - STG
         if: ${{ contains(inputs.stage, 'staging') }}
         uses: aws-actions/configure-aws-credentials@v4
