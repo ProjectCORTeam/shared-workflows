@@ -82,6 +82,8 @@ jobs:
       - name: Sync infra config 
         id: sync-infra-config
         run: |
+          echo ${{ github.repository }}
+          aws s3 ls
           mkdir -p infra-config/.infra
           aws s3 cp s3://cor-infra-us-east-2-services-configs/${{ github.repository }}.json ./infra-config/.infra/infra-config.json
 
