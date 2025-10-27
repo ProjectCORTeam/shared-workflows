@@ -79,6 +79,9 @@ on:
       ACTIONS_TOKEN:
         required: true
         description: "Personal Access Token para acceder a repositorios privados"
+      NPM_TOKEN:
+        required: true
+        description: "Private NPM token"
 
 jobs:
 
