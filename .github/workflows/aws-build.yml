@@ -83,6 +83,9 @@ on:
         required: true
         description: "Private NPM token"
 
+env:
+  NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+
 jobs:
 
   sets-variables:
@@ -321,8 +324,7 @@ jobs:
   docker-build-push:
     runs-on: ${{ inputs.runner }}
     environment:
-      name: ${{ inputs.stage }}
-      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+      name: ${{ inputs.stage }}    
     name: Docker Build and Push to ECR
     needs: [sets-variables, check-stage]
     outputs:
