@@ -321,7 +321,8 @@ jobs:
   docker-build-push:
     runs-on: ${{ inputs.runner }}
     environment:
-      name: ${{ inputs.stage }} 
+      name: ${{ inputs.stage }}
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
     name: Docker Build and Push to ECR
     needs: [sets-variables, check-stage]
     outputs:
