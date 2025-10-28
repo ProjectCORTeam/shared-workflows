@@ -103,7 +103,6 @@ jobs:
       SERVICE_NAME: ${{ steps.set-project-name.outputs.SERVICE_NAME }}
       SERVICE_TYPE: ${{ steps.set-project-name.outputs.SERVICE_TYPE }}
       PROJECT: ${{ steps.set-project-name.outputs.PROJECT }}
-      ECR_REPOSITORY: ${{ steps.set-project-name.outputs.ECR_REPOSITORY }}
     steps:   
       - name: Check Inputs
         id: check-inputs
@@ -286,10 +285,6 @@ jobs:
           echo "PROJECT=$(echo $SERVICE_NAME-${{ env.STAGE }})"
           echo "PROJECT=$(echo $SERVICE_NAME-${{ env.STAGE }})" >> $GITHUB_ENV
           echo "PROJECT=$(echo $SERVICE_NAME-${{ env.STAGE }})" >> $GITHUB_OUTPUT
-          
-          echo "ECR_REPOSITORY=cor-shared-us-east-2-${{env.SERVICE_TYPE}}-${{env.SERVICE_NAME}}"
-          echo "ECR_REPOSITORY=cor-shared-us-east-2-${{env.SERVICE_TYPE}}-${{env.SERVICE_NAME}}" >> $GITHUB_ENV
-          echo "ECR_REPOSITORY=cor-shared-us-east-2-${{env.SERVICE_TYPE}}-${{env.SERVICE_NAME}}" >> $GITHUB_OUTPUT
 
   check-stage:
     runs-on: ${{ inputs.runner }}
@@ -395,12 +390,19 @@ jobs:
           aws-secret-access-key: ${{ secrets.SHARED_AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.SHARED_AWS_REGION }}
 
+      - name: Login to Amazon ECR
+        if: inputs.force_build || env.ECR_IMAGE_EXIST == 'false'
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+        with:
+          mask-password: 'true'
+
       - name: Check ECR image tag
         id: check-ecr-tag
         continue-on-error: true
         run: |
           aws ecr describe-images \
-            --repository-name ${{ needs.sets-variables.outputs.ECR_REPOSITORY }} \
+            --repository-name ${{ steps.login-ecr.outputs.registry }}/cor-shared-us-east-2-${{ needs.sets-variables.outputs.SERVICE_TYPE }}-${{ needs.sets-variables.outputs.SERVICE_NAME }} \
             --region ${{ secrets.SHARED_AWS_REGION }} \
             --image-ids imageTag=${{ env.RELEASE_VERSION }}
 
@@ -421,13 +423,6 @@ jobs:
         run: |
           chmod +x .infra/cicd/pre-build.sh
           ./.infra/cicd/pre-build.sh
-
-      - name: Login to Amazon ECR
-        if: inputs.force_build || env.ECR_IMAGE_EXIST == 'false'
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
-        with:
-          mask-password: 'true'
 
       - name: Set up Docker Buildx
         if: inputs.force_build || env.ECR_IMAGE_EXIST == 'false'
