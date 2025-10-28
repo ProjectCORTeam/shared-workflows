@@ -391,7 +391,6 @@ jobs:
           aws-region: ${{ secrets.SHARED_AWS_REGION }}
 
       - name: Login to Amazon ECR
-        if: inputs.force_build || env.ECR_IMAGE_EXIST == 'false'
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
         with:
