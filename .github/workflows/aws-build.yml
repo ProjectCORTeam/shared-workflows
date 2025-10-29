@@ -401,7 +401,7 @@ jobs:
         continue-on-error: true
         run: |
           aws ecr describe-images \
-            --repository-name ${{ steps.login-ecr.outputs.registry }}/cor-shared-us-east-2-${{ needs.sets-variables.outputs.SERVICE_TYPE }}-${{ needs.sets-variables.outputs.SERVICE_NAME }} \
+            --repository-name cor-shared-us-east-2-${{ needs.sets-variables.outputs.SERVICE_TYPE }}-${{ needs.sets-variables.outputs.SERVICE_NAME }} \
             --region ${{ secrets.SHARED_AWS_REGION }} \
             --image-ids imageTag=${{ env.RELEASE_VERSION }}
 
