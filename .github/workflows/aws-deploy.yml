@@ -143,86 +143,116 @@ jobs:
             --version ${{ inputs.release_version }} \
             --namespace $K8S_NAMESPACE --atomic --reuse-values --timeout 5m
   terraform:
-    name: "Terraform"
-    runs-on: ${{ inputs.runner }}
-    environment:
-      name: ${{ inputs.stage }}
-    if: false
-    steps:
-      - name: Cache Terraform files
-        uses: actions/cache@v4
-        with:
-          path: |
-            .infra/terraform/.terraform
-          key: terraform-${{ inputs.stage }}
+      name: "Terraform"
+      runs-on: ${{ inputs.runner }}
+      steps:
+        - name: Install Terraform
+          uses: little-core-labs/install-terraform@v2.0.0
+          with:
+              version: 1.5.3
+        - name: Setup Terraform
+          shell: bash
+          run: |
+            cat >~/.terraformrc <<EOL
+            credentials "app.terraform.io" {
+              token = "${{ secrets.TF_API_TOKEN }}"
+            }
+            EOL
+    
+        - name: Checkout
+          uses: actions/checkout@v3
 
-      - id: install-aws-cli
-        if: contains( inputs.runner, 'k8s-runners-stg' )
-        uses: unfor19/install-aws-cli-action@v1
-        with:
-          version: 2     # default
-          verbose: false # default
-          arch: amd64    # allowed values: amd64, arm64
 
-      - name: Install Terraform
-        if: contains( inputs.runner, 'k8s-runners-stg' )
-        uses: little-core-labs/install-terraform@v2.0.0
-        with:
-            version: ${{ inputs.infra_terraform_version }}
+        - name: Input preprocessing
+          shell: bash
+          working-directory: .infra/terraform
+          run: |
+            if [[ ${{inputs.stage}} == "master" ]]; \
+            then \
+            echo "STAGE=production" >> $GITHUB_ENV; \
+            else \
+            echo "STAGE=${{inputs.stage}}" >> $GITHUB_ENV ; \
+            fi
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 18
+        - name: Input checks
+          shell: bash
+          working-directory: .infra/terraform
+          run: |
+            echo "github_event: "${{github.event_name }}
+            echo "github_branch: "${{github.ref}}
+            echo "runner: "${{ inputs.runner }}
+            echo "env_check: "${{inputs.env_check}}
+            echo "new_stage: "${{ inputs.new_stage }}
+            echo "stage: "${{env.STAGE}}
+            echo "release_version: "${{inputs.release_version}}
 
-      - name: Setup Terraform
-        shell: bash
-        run: |
-          cat >~/.terraformrc <<EOL
-          credentials "app.terraform.io" {
-            token = "${{ secrets.TF_API_TOKEN }}"
-          }
-          EOL
-          #echo "TF_PLUGIN_CACHE_DIR=$HOME/.terraform.d/plugin-cache" >>"$GITHUB_ENV"
-          #mkdir --parents "$HOME/.terraform.d/plugin-cache"
+        - name: Generate terraform.auto.tfvars for environment
+          # if:  contains(fromJson('["true"]'), inputs.new_stage )
+          id: tfvars_generator
+          shell: bash
+          working-directory: .infra
+          run: |
+            if [ ${{env.STAGE}} == 'production' ] || [ ${{env.STAGE}} == 'beta' ]; then \
+              jq --argjson new_env '{"new_env": ${{ inputs.new_stage }}}' --arg commit_id "$(git rev-parse --short HEAD)" --arg version ${{inputs.release_version}} '.commit_id += $commit_id | (.env_settings[]) += {new_env: false} | .env_settings |= map(if .stage == "${{env.STAGE}}" then . += $new_env + {release_version: $version} else . end)' infra-config.json > ./terraform/terraform.auto.tfvars.json              
+            else \
+              jq --argjson new_env '{"new_env": ${{ inputs.new_stage }}}' --arg commit_id "$(git rev-parse --short HEAD)" '.commit_id += $commit_id | (.env_settings[]) += {new_env: false} | .env_settings |= map(if .stage == "${{env.STAGE}}" then . += $new_env else . end)' infra-config.json > ./terraform/terraform.auto.tfvars.json
+            fi
+            terraform fmt
+            cat ./terraform/terraform.auto.tfvars.json
 
-      - name: Import Templates
-        uses: actions/checkout@v4
-        with:
-          repository: ProjectCORTeam/infra-service-templates
-          ref: ${{ inputs.infra_templates_version }}
-          path: infra-templates
-          token: ${{ secrets.ACTIONS_TOKEN }}
-          sparse-checkout: |
-            templates
-          fetch-depth: 1
+        # - name: Generate terraform.auto.tfvars for existing environment
+        #   if:  contains(fromJson('["false"]'), inputs.new_stage )
+        #   id: tfvars_generator_existing
+        #   shell: bash
+        #   working-directory: .infra
+        #   run: |
+        #     echo "Release version: "${{inputs.release_version}}
+        #     echo "Commit ID: $(git rev-parse --short HEAD)"
+            
+        #     if [ ${{env.STAGE}} == 'production' ] || [ ${{env.STAGE}} == 'beta' ]; then \
+        #       jq --argjson new_env '{"new_env": ${{ inputs.new_stage }}}' --arg commit_id "$(git rev-parse --short HEAD)" --arg version ${{inputs.release_version}} '.commit_id += $commit_id | (.env_settings[]) += {new_env: false} | .env_settings |= map(if .stage == "${{env.STAGE}}" then . += $new_env + {release_version: $version} else . end)' infra-config.json > ./terraform/terraform.auto.tfvars.json              
+        #     else \
+        #       jq --argjson new_env '{"new_env": ${{ inputs.new_stage }}}' --arg commit_id "$(git rev-parse --short HEAD)" '.commit_id += $commit_id | (.env_settings[]) += {new_env: false} | .env_settings |= map(if .stage == "${{env.STAGE}}" then . += $new_env else . end)' infra-config.json > ./terraform/terraform.auto.tfvars.json
+        #     fi
+        #     terraform fmt
+        #     cat ./terraform/terraform.auto.tfvars.json
 
-      - name: Import service infra config
-        uses: actions/checkout@v4
-        with:
-          path: infra-config
-          sparse-checkout: |
-            .infra/
-          fetch-depth: 1
+        - name: Terraform Format
+          id: fmt
+          run: terraform fmt -check -recursive -diff
+          working-directory: .infra/terraform
 
-      - name: Configure AWS Credentials - INFRA
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.INFRA_AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.INFRA_AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.INFRA_AWS_REGION }}
-  
-      - name: Sync infra config 
-        id: sync-infra-config
-        run: |
-          aws s3 cp s3://cor-infra-us-east-2-services-configs/${{ github.repository }}.json ./infra-config/.infra/infra-config.json
+        - name: Terraform Init
+          id: init
+          run: terraform init                    
+          working-directory: .infra/terraform
+        
+        - name: Terraform Validate
+          id: validate
+          run: terraform validate -no-color
+          working-directory: .infra/terraform
 
-      - name: Setup Infra service files
-        shell: bash
-        run: |
+        - name: Terraform Apply Staging
+          if: github.event_name == 'workflow_dispatch'
+          id: infra-apply-staging
+          run: terraform apply -auto-approve -input=false -target='module.shared' -target='module.staging["${{ env.STAGE }}"]'
+          working-directory: .infra/terraform
 
-          if [ ! -d ".infra" ]; then
-            mkdir .infra
-          fi
+        - name: Google Chat Notification - Staging
+          if: github.event_name == 'workflow_dispatch'
+          uses: nakamuraos/google-chat-notifications@v2.1.0
+          with:
+            title: Infrastructure Apply
+            subtitle: Staging - ${{ env.STAGE }}
+            webhookUrl: ${{ secrets.GOOGLE_WEBHOOK }}
+            status: ${{ steps.infra-apply-staging.outcome }}
+
+        - name: Terraform Plan Beta
+          if: github.event_name == 'pull_request' && contains( github.base_ref, 'beta' )
+          id: plan-beta
+          run: terraform plan -no-color -input=false -target='module.shared' -target='module.prod["beta"]'
+          continue-on-error: true
+          working-directory: .infra/terraform
         
           cp ./infra-config/.infra/infra-config.json .infra/infra-config.json
 

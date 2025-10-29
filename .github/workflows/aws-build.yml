@@ -156,6 +156,13 @@ jobs:
           ls -la .infra/
           cat .infra/infra-config.json
 
+      - id: install-aws-cli
+        uses: unfor19/install-aws-cli-action@v1
+        with:
+          version: 2     # default
+          verbose: false # default
+          arch: amd64    # allowed values: amd64, arm64
+
       - name: Get Commit Hash
         id: get-commit-ids
         run: |
