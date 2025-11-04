@@ -134,14 +134,6 @@ jobs:
               aws --version
           fi
 
-#      - id: install-aws-cli
-#        if: contains( inputs.runner, 'k8s-runners-stg' )
-#        uses: unfor19/install-aws-cli-action@v1
-#        with:
-#          version: 2
-#          verbose: false
-#          arch: amd64
-          
       - name: Configure AWS Credentials - INFRA
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -297,13 +289,13 @@ jobs:
       stage_check: ${{ steps.check-stage-config.outputs.stage_check }}
       
     steps:
-      - id: install-aws-cli
-        if: contains( inputs.runner, 'k8s-runners-stg' )
-        uses: unfor19/install-aws-cli-action@v1
-        with:
-          version: 2
-          verbose: false
-          arch: amd64
+#      - id: install-aws-cli
+#        if: contains( inputs.runner, 'k8s-runners-stg' )
+#        uses: unfor19/install-aws-cli-action@v1
+#        with:
+#          version: 2
+#          verbose: false
+#          arch: amd64
 
       - name: Configure AWS Credentials - INFRA
         uses: aws-actions/configure-aws-credentials@v4
@@ -354,14 +346,6 @@ jobs:
           ref: ${{ inputs.infra_templates_version }}
           path: infra-templates
           token: ${{ secrets.ACTIONS_TOKEN }}
-
-      - id: install-aws-cli
-        if: contains( inputs.runner, 'k8s-runners-stg' )
-        uses: unfor19/install-aws-cli-action@v1
-        with:
-          version: 2
-          verbose: false
-          arch: amd64
 
       - name: Set release version
         id: set-release-version
