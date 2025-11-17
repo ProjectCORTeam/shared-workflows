@@ -26,6 +26,10 @@ on:
         required: true
         type: string
         description: "Semantic versioning for production environment"
+      build_workflow_start_time:
+        required: false
+        type: string
+        description: "Start time from aws-build workflow for total duration calculation"
       notifications:
         required: false
         type: boolean
@@ -72,6 +76,17 @@ jobs:
     environment:
       name: ${{ inputs.stage }}
     steps: 
+      - name: Set workflow start time
+        id: workflow-start-time
+        run: |
+          if [ -n "${{ inputs.build_workflow_start_time }}" ]; then
+            # Si viene del build workflow, usar ese tiempo
+            echo "start_time=${{ inputs.build_workflow_start_time }}" >> $GITHUB_OUTPUT
+          else
+            # Si no viene (deploy standalone), usar tiempo actual
+            echo "start_time=$(date +%s)" >> $GITHUB_OUTPUT
+          fi
+
       - name: Configure AWS Credentials - INFRA
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -148,6 +163,36 @@ jobs:
             cor/$SERVICE_TYPE-$SERVICE_NAME \
             --version ${{ inputs.release_version }} \
             --namespace $K8S_NAMESPACE --atomic --reuse-values --timeout 5m
+
+      - name: Calculate total workflow duration
+        id: total-workflow-duration
+        if: always()
+        run: |
+          start_time=${{ steps.workflow-start-time.outputs.start_time }}
+          end_time=$(date +%s)
+          duration=$((end_time - start_time))
+          minutes=$((duration / 60))
+          seconds=$((duration % 60))
+          if [ $minutes -gt 0 ]; then
+            duration_formatted="${minutes}m ${seconds}s"
+          else
+            duration_formatted="${seconds}s"
+          fi
+          echo "duration=$duration_formatted" >> $GITHUB_OUTPUT
+          if [ -n "${{ inputs.build_workflow_start_time }}" ]; then
+            echo "Total duration (build + deploy): $duration_formatted"
+          else
+            echo "Total workflow duration: $duration_formatted"
+          fi
+
+      - name: Google Chat Notification - Staging
+        if: always() && ${{ !contains(fromJSON('["production", "beta"]'), inputs.stage) }}
+        uses: nakamuraos/google-chat-notifications@v2.1.0
+        with:
+          title: Infrastructure Apply
+          subtitle: "Staging - ${{ inputs.stage }} | Total Duration: ${{ steps.total-workflow-duration.outputs.duration }}"
+          webhookUrl: ${{ secrets.GOOGLE_WEBHOOK }}
+          status: ${{ job.status }}
   terraform:
     name: "Terraform"
     runs-on: ${{ inputs.runner }}

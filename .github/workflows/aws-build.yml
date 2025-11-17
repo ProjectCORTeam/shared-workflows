@@ -50,6 +50,9 @@ on:
       release_version:
         description: "Semantic versioning for production environment"
         value: ${{ jobs.docker-build-push.outputs.release_version }}
+      workflow_start_time:
+        description: "Workflow start time for total duration calculation"
+        value: ${{ jobs.sets-variables.outputs.WORKFLOW_START_TIME }}
     
     secrets: 
       CICD_AWS_ACCESS_KEY_ID:
@@ -103,7 +106,12 @@ jobs:
       SERVICE_NAME: ${{ steps.set-project-name.outputs.SERVICE_NAME }}
       SERVICE_TYPE: ${{ steps.set-project-name.outputs.SERVICE_TYPE }}
       PROJECT: ${{ steps.set-project-name.outputs.PROJECT }}
+      WORKFLOW_START_TIME: ${{ steps.workflow-start-time.outputs.start_time }}
     steps:   
+      - name: Set workflow start time
+        id: workflow-start-time
+        run: echo "start_time=$(date +%s)" >> $GITHUB_OUTPUT
+
       - name: Check Inputs
         id: check-inputs
         run: |
@@ -489,12 +497,29 @@ jobs:
         run: |
           echo "env_check=success" >> $GITHUB_OUTPUT
 
+      - name: Calculate workflow duration
+        id: workflow-duration
+        if: always()
+        run: |
+          workflow_start_time=${{ needs.sets-variables.outputs.WORKFLOW_START_TIME }}
+          workflow_end_time=$(date +%s)
+          duration=$((workflow_end_time - workflow_start_time))
+          minutes=$((duration / 60))
+          seconds=$((duration % 60))
+          if [ $minutes -gt 0 ]; then
+            duration_formatted="${minutes}m ${seconds}s"
+          else
+            duration_formatted="${seconds}s"
+          fi
+          echo "duration=$duration_formatted" >> $GITHUB_OUTPUT
+          echo "Total workflow duration: $duration_formatted"
+
       - name: Google Chat Notification - Build Success
         if: inputs.notifications && (inputs.force_build || env.ECR_IMAGE_EXIST == 'false')
         uses: nakamuraos/google-chat-notifications@v2.1.0
         with:
           title: Image Build Success
-          subtitle: ${{ env.RELEASE_VERSION }}
+          subtitle: "${{ env.RELEASE_VERSION }} | Total Duration: ${{ steps.workflow-duration.outputs.duration }}"
           webhookUrl: ${{ secrets.GOOGLE_WEBHOOK }}
           status: 'success'
 
@@ -503,7 +528,7 @@ jobs:
         uses: nakamuraos/google-chat-notifications@v2.1.0
         with:
           title: Image Build Skipped
-          subtitle: ${{ env.RELEASE_VERSION }} already exists
+          subtitle: "${{ env.RELEASE_VERSION }} already exists | Total Duration: ${{ steps.workflow-duration.outputs.duration }}"
           webhookUrl: ${{ secrets.GOOGLE_WEBHOOK }}
           status: 'success'
 
