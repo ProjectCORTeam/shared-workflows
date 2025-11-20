@@ -555,14 +555,6 @@ jobs:
             echo "| **Image Tag** | \`${{ needs.docker-build-push.outputs.release_version }}\` |" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             
-            # Status de los jobs
-            echo "## 📊 Job Statuses" >> $GITHUB_STEP_SUMMARY
-            echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
-            echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
-            echo "| **Sets Variables** | ${{ needs.sets-variables.result == 'success' && '✅ Success' || needs.sets-variables.result == 'failure' && '❌ Failed' || needs.sets-variables.result == 'cancelled' && '🚫 Cancelled' || '⏭️ Skipped' }} |" >> $GITHUB_STEP_SUMMARY
-            echo "| **Check Stage** | ${{ needs.check-stage.result == 'success' && '✅ Success' || needs.check-stage.result == 'failure' && '❌ Failed' || needs.check-stage.result == 'cancelled' && '🚫 Cancelled' || '⏭️ Skipped' }} |" >> $GITHUB_STEP_SUMMARY
-            echo "| **Docker Build & Push** | ${{ needs.docker-build-push.result == 'success' && '✅ Success' || needs.docker-build-push.result == 'failure' && '❌ Failed' || needs.docker-build-push.result == 'cancelled' && '🚫 Cancelled' || '⏭️ Skipped' }} |" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
             
             # Links útiles
             echo "## 🔗 Quick Links" >> $GITHUB_STEP_SUMMARY
