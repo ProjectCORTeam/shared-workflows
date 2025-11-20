@@ -396,7 +396,7 @@ jobs:
           echo "ECR check outcome: ${{ steps.check-ecr-tag.outcome }}"
           if [ '${{ steps.check-ecr-tag.outcome }}' == 'failure' ]; then
             echo "Release version is not builded"
-            echo "ECR_IMAGE_EXIST=false" >> $
+            echo "ECR_IMAGE_EXIST=false" >> $GITHUB_ENV
             echo "ECR_IMAGE_EXIST=false" >> $GITHUB_OUTPUT  
 
           elif [ '${{ steps.check-ecr-tag.outcome }}' == 'success' ]; then
