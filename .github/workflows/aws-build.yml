@@ -429,6 +429,12 @@ jobs:
           chmod +x .infra/cicd/build.sh
           ./.infra/cicd/build.sh
 
+      - name: Clean Docker before build
+        run: |
+          docker system prune -af --volumes
+          docker buildx prune -af
+          df -h  # Ver espacio disponible
+
       - name: Build and push Docker image
         if: inputs.force_build || env.ECR_IMAGE_EXIST == 'false'
         uses: docker/build-push-action@v5
