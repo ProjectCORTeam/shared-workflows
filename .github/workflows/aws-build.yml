@@ -460,24 +460,24 @@ jobs:
 
       # prueba
       - name: Cache Helm
-        if: inputs.force_build || env.ECR_IMAGE_EXIST == 'false'
         uses: actions/cache@v4
         with:
           path: |
-            ~/.local/share/helm
+            ~/.local/share/helm/plugins
             ~/.cache/helm
-          key: helm-${{ runner.os }}
+            ~/.config/helm
+          key: helm-${{ runner.os }}-${{ hashFiles('**/Chart.yaml') }}
           restore-keys: |
-            helm-${{ runner.os }}
+            helm-${{ runner.os }}-
 
       - name: Install Helm
-        if: inputs.force_build || env.ECR_IMAGE_EXIST == 'false'
         uses: azure/setup-helm@v4
-
+      
       - name: Setup Helm ChartMuseum
-        if: inputs.force_build || env.ECR_IMAGE_EXIST == 'false'
         run: |
+          helm version
           helm plugin install https://github.com/chartmuseum/helm-push || true
+          helm plugin list
           helm repo add cor https://chartmuseum.shared.projectcor.com
           helm repo update
 
@@ -492,7 +492,7 @@ jobs:
           
           # Empaquetar y pushear el chart
           helm package . --version ${{ env.RELEASE_VERSION }} --app-version ${{ env.RELEASE_VERSION }}
-          helm push ${{ needs.sets-variables.outputs.SERVICE_TYPE }}-${{ needs.sets-variables.outputs.SERVICE_NAME }}-${{ env.RELEASE_VERSION }}.tgz cor -f
+          helm cm-push ${{ needs.sets-variables.outputs.SERVICE_TYPE }}-${{ needs.sets-variables.outputs.SERVICE_NAME }}-${{ env.RELEASE_VERSION }}.tgz cor
 
       - name: Run custom post-build script
         if: (inputs.force_build || env.ECR_IMAGE_EXIST == 'false') && hashFiles('.infra/cicd/post-build.sh') != ''
