@@ -473,7 +473,7 @@ jobs:
       - name: Install Helm
         uses: azure/setup-helm@v4
         with:
-           version: '{{ env.HELM_VERSION }}'
+           version: '{{ vars.HELM_VERSION }}'
       
       - name: Setup Helm ChartMuseum
         run: |
