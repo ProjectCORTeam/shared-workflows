@@ -329,7 +329,7 @@ jobs:
       name: ${{ inputs.stage }}
     name: Docker Build and Push to ECR
     env:
-      helm_version: 'v3.20.0'
+      helm_version: '3.20.0'
     needs: [sets-variables, check-stage]
     outputs:
       release_version: ${{ steps.set-release-version.outputs.RELEASE_VERSION }}
@@ -475,7 +475,7 @@ jobs:
       - name: Install Helm
         uses: azure/setup-helm@v4
         with:
-           version: '{{ env.helm_version }}'
+           version: 'v3.20.0' #{{ env.helm_version }}'
       
       - name: Setup Helm ChartMuseum
         run: |
