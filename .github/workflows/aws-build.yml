@@ -492,7 +492,7 @@ jobs:
           
           # Empaquetar y pushear el chart
           helm package . --version ${{ env.RELEASE_VERSION }} --app-version ${{ env.RELEASE_VERSION }}
-          helm cm-push ${{ needs.sets-variables.outputs.SERVICE_TYPE }}-${{ needs.sets-variables.outputs.SERVICE_NAME }}-${{ env.RELEASE_VERSION }}.tgz cor -f
+          helm push ${{ needs.sets-variables.outputs.SERVICE_TYPE }}-${{ needs.sets-variables.outputs.SERVICE_NAME }}-${{ env.RELEASE_VERSION }}.tgz cor -f
 
       - name: Run custom post-build script
         if: (inputs.force_build || env.ECR_IMAGE_EXIST == 'false') && hashFiles('.infra/cicd/post-build.sh') != ''
