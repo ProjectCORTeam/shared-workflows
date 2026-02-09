@@ -466,15 +466,13 @@ jobs:
           path: |
             ~/.local/share/helm
             ~/.cache/helm
-          key: helm-${{ runner.os }}-v3.14.4
+          key: helm-${{ runner.os }}
           restore-keys: |
-            helm-${{ runner.os }}-
+            helm-${{ runner.os }}
 
       - name: Install Helm
         if: inputs.force_build || env.ECR_IMAGE_EXIST == 'false'
         uses: azure/setup-helm@v4
-        with:
-          version: 'v3.14.4'
 
       - name: Setup Helm ChartMuseum
         if: inputs.force_build || env.ECR_IMAGE_EXIST == 'false'
