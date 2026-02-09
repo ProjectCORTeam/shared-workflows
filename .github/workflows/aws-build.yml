@@ -474,8 +474,8 @@ jobs:
 
       - name: Install Helm
         uses: azure/setup-helm@v4
-        with:
-          version: ${{ vars.HELM_VERSION }} #'v3.17.0' #{{ env.helm_version }}'
+        #with:
+          #version: ${{ vars.HELM_VERSION }} #'v3.17.0' #{{ env.helm_version }}'
       
       - name: Setup Helm ChartMuseum
         run: |
@@ -488,7 +488,7 @@ jobs:
       - name: Package and Upload Helm Chart (ChartMuseum API)
         if: inputs.force_build || env.ECR_IMAGE_EXIST == 'false'
         env:
-          CHARTMUSEUM_URL: ${{ vars.CHARTMUSEUM_URL }}
+          CHARTMUSEUM_URL: https://chartmuseum.shared.projectcor.com #${{ vars.CHARTMUSEUM_URL }}
           #CHARTMUSEUM_USER: ${{ secrets.CHARTMUSEUM_USER }}
           #CHARTMUSEUM_PASS: ${{ secrets.CHARTMUSEUM_PASS }}
         run: |
