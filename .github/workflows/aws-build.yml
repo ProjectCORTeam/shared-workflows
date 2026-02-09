@@ -480,8 +480,8 @@ jobs:
       - name: Setup Helm ChartMuseum
         run: |
           helm version
-          helm plugin install https://github.com/chartmuseum/helm-push          
-          helm plugin list
+          # helm plugin install https://github.com/chartmuseum/helm-push          
+          # helm plugin list
           helm repo add cor https://chartmuseum.shared.projectcor.com
           helm repo update
 
