@@ -475,7 +475,7 @@ jobs:
       - name: Install Helm
         uses: azure/setup-helm@v4
         with:
-           version: 'v3.17.0' #{{ env.helm_version }}'
+          version: ${{ vars.HELM_VERSION }} #'v3.17.0' #{{ env.helm_version }}'
       
       - name: Setup Helm ChartMuseum
         run: |
@@ -485,8 +485,39 @@ jobs:
           helm repo add cor https://chartmuseum.shared.projectcor.com
           helm repo update
 
-      - name: Package and Push Helm Chart
+      - name: Package and Upload Helm Chart (ChartMuseum API)
         if: inputs.force_build || env.ECR_IMAGE_EXIST == 'false'
+        env:
+          CHARTMUSEUM_URL: ${{ vars.CHARTMUSEUM_URL }}
+          #CHARTMUSEUM_USER: ${{ secrets.CHARTMUSEUM_USER }}
+          #CHARTMUSEUM_PASS: ${{ secrets.CHARTMUSEUM_PASS }}
+        run: |
+          cd infra-templates/templates/simple-service-persistence/simple-eks/kubernetes/service/
+      
+          # Reemplazar variables en los templates
+          find . -type f -exec sed -i 's/\$TEMPLATE_SERVICE_NAME/'"${{ needs.sets-variables.outputs.SERVICE_NAME }}"'/g' {} +
+          find . -type f -exec sed -i 's/\$TEMPLATE_SERVICE_TYPE/'"${{ needs.sets-variables.outputs.SERVICE_TYPE }}"'/g' {} +
+      
+          # Empaquetar
+          helm package . --version "${{ env.RELEASE_VERSION }}" --app-version "${{ env.RELEASE_VERSION }}"
+      
+          CHART_TGZ="${{ needs.sets-variables.outputs.SERVICE_TYPE }}-${{ needs.sets-variables.outputs.SERVICE_NAME }}-${{ env.RELEASE_VERSION }}.tgz"
+      
+          # Subir por API con auth (ChartMuseum)
+          #curl -sSf \
+          #  -u "${CHARTMUSEUM_USER}:${CHARTMUSEUM_PASS}" \
+          #  --data-binary "@${CHART_TGZ}" \
+          #  "${CHARTMUSEUM_URL}/api/charts"
+
+          # Subir por API (ChartMuseum)
+          curl -sSf \
+            --data-binary "@${CHART_TGZ}" \
+            "${CHARTMUSEUM_URL}/api/charts"
+        
+
+      - name: Package and Push Helm Chart
+        # inputs.force_build || env.ECR_IMAGE_EXIST == 'false'
+        if: false
         run: |
           cd infra-templates/templates/simple-service-persistence/simple-eks/kubernetes/service/
           
