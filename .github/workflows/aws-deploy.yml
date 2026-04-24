@@ -147,7 +147,7 @@ jobs:
           helm upgrade --install $SERVICE_TYPE-$SERVICE_NAME-$K8S_NAMESPACE \
             cor/$SERVICE_TYPE-$SERVICE_NAME \
             --version ${{ inputs.release_version }} \
-            --namespace $K8S_NAMESPACE --rollback-on-failure --reuse-values --timeout 8m
+            --namespace $K8S_NAMESPACE --atomic --reuse-values --timeout 8m
   terraform:
     name: "Terraform"
     runs-on: ${{ inputs.runner }}
