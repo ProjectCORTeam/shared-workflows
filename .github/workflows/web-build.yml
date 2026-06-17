@@ -196,18 +196,27 @@ jobs:
               aws --version
           fi
       
-      - name: Configure AWS Credentials - SECURITY
+      - name: Configure AWS Credentials - STG
+        if: ${{ contains(inputs.stage, 'staging') }}
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.SECURITY_AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.SECURITY_AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.SECURITY_AWS_REGION }}
+          aws-access-key-id: ${{ secrets.STG_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.STG_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.STG_AWS_REGION }}
+
+      - name: Configure AWS Credentials - PROD
+        if: ${{ contains(fromJSON('["production", "beta"]'), inputs.stage) }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.PROD_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.PROD_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.PROD_AWS_REGION }}
       
       - name: Sync environment variables 
         id: sync-environment-variables
         run: |
           aws secretsmanager get-secret-value \
-            --region ${{ secrets.SECURITY_AWS_REGION }} \
+            --region us-east-2 \
             --secret-id ${{ vars.ENV_SECRET_ARN }} \
             --query SecretString --output text \
             | jq -r 'to_entries | .[] | "\(.key)=\(.value)"' > .env
