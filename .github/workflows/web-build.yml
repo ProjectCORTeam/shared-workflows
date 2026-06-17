@@ -220,6 +220,7 @@ jobs:
             --secret-id ${{ vars.ENV_SECRET_ARN }} \
             --query SecretString --output text \
             | jq -r 'to_entries | .[] | "\(.key)=\(.value)"' > .env
+          cat .env
 
       - name: Set release version
         id: set-release-version
@@ -276,7 +277,7 @@ jobs:
       - name: Prepare .env for build
         run: |
           echo "${{ needs.sets-variables.outputs.SHORT_COMMIT_HASH }}" > .version
-          VERSION=$(cat .version)
+          VERSION=${{ needs.sets-variables.outputs.SHORT_COMMIT_HASH }}
           sed -i 's/\r//' .env
           sed -i "s/{{VERSION}}/${VERSION}/g" .env
 
@@ -297,8 +298,6 @@ jobs:
           echo "Building Docker image ${IMAGE_TAG}..."
           docker build \
             --build-arg NPM_TOKEN="${NPM_TOKEN}" \
-            --build-arg APP_ENV="${RUN_ENV}" \
-            --build-arg VERSION="${RELEASE_VERSION}" \
             --build-arg AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID}" \
             --build-arg AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}" \
             --build-arg AWS_SESSION_TOKEN="${AWS_SESSION_TOKEN:-}" \
