@@ -318,11 +318,7 @@ jobs:
           docker cp "${CONTAINER_ID}:/var/www/." artifact-output/
           docker rm "${CONTAINER_ID}"
 
-          echo "Applying CodeDeploy stage substitutions..."
-          sed -i "s/\${STAGE_SHORT}/${STAGE_SHORT}/g" artifact-output/appspec.yml
-          sed -i "s/\${STAGE_SHORT}/${STAGE_SHORT}/g" artifact-output/.infra/codedeploy/AfterInstall.sh
-          sed -i "s/\${STAGE_SHORT}/${STAGE_SHORT}/g" artifact-output/.infra/codedeploy/BeforeInstall.sh
-
+          
           echo "Packaging artifact ${ARTIFACT} (excluding node_modules)..."
           rm -rf artifact-output/node_modules
           (
