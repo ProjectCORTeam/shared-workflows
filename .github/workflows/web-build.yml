@@ -27,17 +27,17 @@ on:
         value: ${{ jobs.build-push.outputs.release_version }}
     
     secrets: 
-      SECURITY_AWS_ACCESS_KEY_ID:
+      STG_AWS_ACCESS_KEY_ID:
         required: true
-      SECURITY_AWS_SECRET_ACCESS_KEY:
+      STG_AWS_SECRET_ACCESS_KEY:
         required: true
-      SECURITY_AWS_REGION:
+      STG_AWS_REGION:
         required: true
-      INFRA_AWS_ACCESS_KEY_ID:
+      PROD_AWS_ACCESS_KEY_ID:
         required: true
-      INFRA_AWS_SECRET_ACCESS_KEY:
+      PROD_AWS_SECRET_ACCESS_KEY:
         required: true
-      INFRA_AWS_REGION:
+      PROD_AWS_REGION:
         required: true
       SHARED_AWS_ACCESS_KEY_ID:
         required: true
