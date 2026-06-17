@@ -1,0 +1,271 @@
+name: Web Custom Build
+
+on: 
+  workflow_call:
+    inputs: 
+      trigger_type:
+        required: true
+        type: string
+      stage:
+        required: false
+        type: string
+      notifications:
+        required: false
+        type: boolean
+        default: true
+        description: "Enable notifications to cloud or team owner flag"
+
+    outputs:
+      env_check:
+        description: "Environment status checker"
+        value: ${{ jobs.build-push.outputs.env_check }}
+      stage:
+        description: "Stage name for infrastructure deployment"
+        value: ${{ jobs.sets-variables.outputs.STAGE }}
+      release_version:
+        description: "Semantic versioning for production environment"
+        value: ${{ jobs.build-push.outputs.release_version }}
+    
+    secrets: 
+      SECURITY_AWS_ACCESS_KEY_ID:
+        required: true
+      SECURITY_AWS_SECRET_ACCESS_KEY:
+        required: true
+      SECURITY_AWS_REGION:
+        required: true
+      INFRA_AWS_ACCESS_KEY_ID:
+        required: true
+      INFRA_AWS_SECRET_ACCESS_KEY:
+        required: true
+      INFRA_AWS_REGION:
+        required: true
+      SHARED_AWS_ACCESS_KEY_ID:
+        required: true
+      SHARED_AWS_SECRET_ACCESS_KEY:
+        required: true
+      SHARED_AWS_REGION:
+        required: true
+      GOOGLE_WEBHOOK:
+        required: true
+      DOCKERHUB_USERNAME:
+        required: false
+      DOCKERHUB_PASSWORD:
+        required: false
+      ACTIONS_TOKEN:
+        required: true
+        description: "Personal Access Token para acceder a repositorios privados"
+      NPM_TOKEN:
+        required: true
+        description: "Private NPM token"
+
+env:
+  NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+jobs:
+
+  sets-variables:
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.stage }}
+    name: Sets Variables
+    outputs:
+      COMMIT_HASH: ${{ steps.get-commit-ids.outputs.COMMIT_HASH }}
+      SHORT_COMMIT_HASH: ${{ steps.get-commit-ids.outputs.SHORT_COMMIT_HASH }}
+      RELEASE_TAG: ${{ steps.version-tag.outputs.RELEASE_TAG }}
+      STAGE: ${{ steps.stage.outputs.STAGE }}
+      STAGE_SHORT: ${{ steps.stage.outputs.STAGE_SHORT }}
+    steps:   
+      - name: Check Inputs
+        id: check-inputs
+        run: |
+          echo "Checking job inputs...."
+          echo "trigger_type: ${{inputs.trigger_type}}"
+          echo "input stage: ${{inputs.stage}}"
+          echo "notifications: ${{inputs.notifications}}"
+          echo "is prerelease: " ${{github.event.release.prerelease}}
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Get Commit Hash
+        id: get-commit-ids
+        run: |
+          echo "COMMIT_HASH=${{ github.sha }}" >> $GITHUB_ENV
+          echo "COMMIT_HASH=${{ github.sha }}" >> $GITHUB_OUTPUT
+
+          short_commit_hash=$(echo ${{ github.sha }} | cut -c 1-7)
+          echo "SHORT_COMMIT_HASH=$short_commit_hash" >> $GITHUB_ENV
+          echo "SHORT_COMMIT_HASH=$short_commit_hash" >> $GITHUB_OUTPUT
+
+          echo "Commit Hash: ${{env.COMMIT_HASH}}"
+          echo "Short Commit Hash: ${{env.SHORT_COMMIT_HASH}}"
+
+      - name: Get version tag
+        continue-on-error: true
+        id: version-tag
+        run: |
+          echo "RELEASE_TAG=null" >> $GITHUB_ENV
+          echo "RELEASE_TAG=null" >> $GITHUB_OUTPUT
+          tag=$(git describe --exact-match --tags HEAD)
+          if [[ -n "$tag" ]]; then
+              echo "Current commit has a tag: $tag"
+              echo "RELEASE_TAG=$tag"
+              echo "RELEASE_TAG=$tag" >> $GITHUB_ENV
+              echo "RELEASE_TAG=$tag" >> $GITHUB_OUTPUT
+              echo "RELEASE_VERSION=$tag" >> $GITHUB_ENV
+              echo "RELEASE_VERSION=$tag" >> $GITHUB_OUTPUT
+          else
+              echo "Current commit does not have a tag"
+          fi
+
+      - name: Get stage
+        id: stage
+        env:
+          STAGE_INPUT: ${{ inputs.stage }}
+        run: |
+          if [[ -z "$STAGE_INPUT" ]]; then
+            echo "STAGE_INPUT is empty. Defaulting to prod."
+            echo "ENVIRONMENT=prod" >> $GITHUB_ENV
+            if [[ "${{ github.event_name }}" == 'release' && "${{ github.event.release.prerelease }}" == true ]]; then
+              echo "This is a pre-release."
+              echo "STAGE=beta" >> $GITHUB_ENV
+              echo "STAGE=beta" >> $GITHUB_OUTPUT
+              echo "STAGE_SHORT=$STAGE_INPUT" >> $GITHUB_ENV
+              echo "STAGE_SHORT=$STAGE_INPUT" >> $GITHUB_OUTPUT
+              elif [[ "${{ github.event_name }}" == 'release' ]]; then
+              echo "This is a full release."
+              echo "STAGE=production" >> $GITHUB_ENV
+              echo "STAGE=production" >> $GITHUB_OUTPUT
+              echo "STAGE_SHORT=$STAGE_INPUT" >> $GITHUB_ENV
+              echo "STAGE_SHORT=$STAGE_INPUT" >> $GITHUB_OUTPUT
+            fi
+          else
+            if [[ "$STAGE_INPUT" =~ ^staging([1-9]|10)?$ ]]; then
+              STAGE=${STAGE_INPUT/staging/}
+              echo "ENVIRONMENT=staging" >> $GITHUB_ENV
+              echo "STAGE=$STAGE_INPUT" >> $GITHUB_ENV
+              echo "STAGE=$STAGE_INPUT" >> $GITHUB_OUTPUT
+              echo "STAGE_SHORT=st$STAGE" >> $GITHUB_ENV
+              echo "STAGE_SHORT=st$STAGE" >> $GITHUB_OUTPUT
+              echo "Se está ejecutando como staging"
+            else
+              echo "Invalid STAGE_INPUT format. Defaulting to prod."
+              echo "ENVIRONMENT=prod" >> $GITHUB_ENV
+              echo "STAGE=$STAGE_INPUT" >> $GITHUB_ENV
+              echo "STAGE=$STAGE_INPUT" >> $GITHUB_OUTPUT
+              echo "STAGE_SHORT=$STAGE_INPUT" >> $GITHUB_ENV
+              echo "STAGE_SHORT=$STAGE_INPUT" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+      - name: Extract branch name
+        id: extract_branch_trunk
+        shell: bash
+        run: |
+          echo "BRANCH_NAME=$GITHUB_REF_NAME" 
+          echo "BRANCH_NAME=$GITHUB_REF_NAME" >> $GITHUB_ENV 
+          echo "BRANCH_NAME=$GITHUB_REF_NAME" >> $GITHUB_OUTPUT 
+
+  build-push:
+    runs-on: ubuntu-26-large
+    environment:
+      name: ${{ inputs.stage }}
+    name: Build and Push Artifacts to S3
+    needs: [sets-variables]
+    outputs:
+      release_version: ${{ steps.set-release-version.outputs.RELEASE_VERSION }}
+      env_check: ${{ steps.build-complete.outputs.env_check }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup AWS CLI
+        run: |
+          if command -v aws &> /dev/null; then
+              echo "✓ AWS CLI ya instalado"
+              aws --version
+          else
+              echo "✗ AWS CLI no encontrado. Instalando..."
+              curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+              unzip awscliv2.zip
+              sudo ./aws/install
+              rm -rf aws awscliv2.zip
+              echo "✓ AWS CLI instalado"
+              aws --version
+          fi
+      
+      - name: Configure AWS Credentials - SECURITY
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.SECURITY_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.SECURITY_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.SECURITY_AWS_REGION }}
+      
+      - name: Sync environment variables 
+        id: sync-environment-variables
+        run: |
+          aws secretsmanager get-secret-value \
+            --region ${{ secrets.SECURITY_AWS_REGION }} \
+            --secret-id ${{ vars.ENV_SECRET_ARN }} \
+            --query SecretString --output text \
+            | jq -r 'to_entries | .[] | "\(.key)=\(.value)"' > .env
+
+      - name: Set release version
+        id: set-release-version
+        run: |
+          if [[ "${{ inputs.stage }}" =~ ^staging ]]; then
+            RELEASE_VERSION=${{ needs.sets-variables.outputs.SHORT_COMMIT_HASH}}
+            RUN_ENV="staging"
+          elif [[ "${{ inputs.stage }}" == "production" ]] || [[ "${{ inputs.stage }}" == "beta" ]] || [[ -z "${{ inputs.stage }}" ]]; then
+            RELEASE_VERSION=${{ needs.sets-variables.outputs.RELEASE_TAG }}
+            RUN_ENV="prod"
+          fi
+          
+          echo "RELEASE_VERSION=$RELEASE_VERSION" >> $GITHUB_ENV
+          echo "RELEASE_VERSION=$RELEASE_VERSION" >> $GITHUB_OUTPUT
+          echo "RUN_ENV=$RUN_ENV" >> $GITHUB_ENV
+          echo "RUN_ENV=$RUN_ENV" >> $GITHUB_OUTPUT
+          echo "Final release version: $RELEASE_VERSION"
+          echo "Environment: $RUN_ENV"
+
+      - name: Configure AWS Credentials - Shared (for ECR)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.SHARED_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.SHARED_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.SHARED_AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+        with:
+          mask-password: 'true'
+
+      - name: Download base image from ECR
+        id: download-base-image
+        run: |
+          docker pull 170071165762.dkr.ecr.us-east-2.amazonaws.com/cor-shared-us-east-2-ms-web-base:latest
+
+      - name: Build complete
+        id: build-complete
+        run: |
+          echo "env_check=success" >> $GITHUB_OUTPUT
+
+      - name: Google Chat Notification - Build Success
+        if: inputs.notifications
+        uses: nakamuraos/google-chat-notifications@v2.1.0
+        with:
+          title: Build Success
+          subtitle: ${{ env.RELEASE_VERSION }}
+          webhookUrl: ${{ secrets.GOOGLE_WEBHOOK }}
+          status: 'success'
+
+      - name: Output summary
+        run: |
+          echo "### Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Stage:** ${{ needs.sets-variables.outputs.STAGE }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Release Version:** ${{ env.RELEASE_VERSION }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment:** ${{ env.RUN_ENV }}" >> $GITHUB_STEP_SUMMARY
