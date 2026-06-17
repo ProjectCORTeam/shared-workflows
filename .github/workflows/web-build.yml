@@ -215,12 +215,18 @@ jobs:
       - name: Sync environment variables 
         id: sync-environment-variables
         run: |
+          ENV_SECRET_ARN="${{ vars.env_secret_arn }}"
+          if [[ -z "${ENV_SECRET_ARN}" ]]; then
+            echo "ERROR: vars.env_secret_arn is empty."
+            echo "Configure the variable 'env_secret_arn' in GitHub Environment '${{ inputs.stage }}' (repo Web, not shared-workflows)."
+            exit 1
+          fi
+
           aws secretsmanager get-secret-value \
             --region us-east-2 \
-            --secret-id ${{ vars.ENV_SECRET_ARN }} \
+            --secret-id "${ENV_SECRET_ARN}" \
             --query SecretString --output text \
             | jq -r 'to_entries | .[] | "\(.key)=\(.value)"' > .env
-          cat .env
 
       - name: Set release version
         id: set-release-version
