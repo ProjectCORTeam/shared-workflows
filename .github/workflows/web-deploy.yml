@@ -6,6 +6,10 @@ on:
       trigger_type:
         required: true
         type: string
+      stage:
+        required: true
+        type: string
+        description: "GitHub Environment name (e.g. staging, production, beta)"
       artifact_s3_uri:
         required: true
         type: string
@@ -51,7 +55,7 @@ jobs:
   aws_codedeploy_deploy:
     runs-on: ubuntu-latest
     environment:
-      name: ${{ github.environment }}
+      name: ${{ inputs.stage }}
     name: AWS CodeDeploy Deploy
     env:
       CODEDEPLOY_APP_NAME: ${{ vars.CODEDEPLOY_APP_NAME }}
@@ -63,15 +67,9 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [[ -z "${{ github.environment }}" ]]; then
-            echo "ERROR: No GitHub Environment configured."
-            echo "Set 'environment: staging' on the job that calls web-deploy.yml."
-            exit 1
-          fi
-
           if [[ -z "${CODEDEPLOY_APP_NAME}" || -z "${CODEDEPLOY_DEPLOYMENT_GROUP}" || -z "${CODEDEPLOY_S3_ARTIFACTS}" ]]; then
-            echo "ERROR: Missing CodeDeploy variables in GitHub Environment '${{ github.environment }}'."
-            echo "Configure CODEDEPLOY_APP_NAME, CODEDEPLOY_DEPLOYMENT_GROUP and CODEDEPLOY_S3_ARTIFACTS in the caller repo."
+            echo "ERROR: Missing CodeDeploy variables in GitHub Environment '${{ inputs.stage }}'."
+            echo "Configure CODEDEPLOY_APP_NAME, CODEDEPLOY_DEPLOYMENT_GROUP and CODEDEPLOY_S3_ARTIFACTS."
             exit 1
           fi
 
