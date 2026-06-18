@@ -30,13 +30,19 @@ on:
       release_version:
         description: "Semantic versioning for production environment"
         value: ${{ jobs.build-push.outputs.release_version }}
+      ARTIFACT_S3_URI:
+        description: "Artifact S3 URI"
+        value: ${{ jobs.build-push.outputs.ARTIFACT_S3_URI }}
+      ARTIFACT_S3_KEY:
+        description: "Artifact S3 object key"
+        value: ${{ jobs.build-push.outputs.ARTIFACT_S3_KEY }}
     
     secrets: 
-      STG_AWS_ACCESS_KEY_ID:
+      MAIN_AWS_ACCESS_KEY_ID:
         required: true
-      STG_AWS_SECRET_ACCESS_KEY:
+      MAIN_AWS_SECRET_ACCESS_KEY:
         required: true
-      STG_AWS_REGION:
+      MAIN_AWS_REGION:
         required: true
       PROD_AWS_ACCESS_KEY_ID:
         required: true
@@ -183,6 +189,8 @@ jobs:
     outputs:
       release_version: ${{ steps.set-release-version.outputs.RELEASE_VERSION }}
       env_check: ${{ steps.build-complete.outputs.env_check }}
+      ARTIFACT_S3_URI: ${{ steps.check-existing-build.outputs.ARTIFACT_S3_URI }}
+      ARTIFACT_S3_KEY: ${{ steps.check-existing-build.outputs.ARTIFACT_S3_KEY }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -214,9 +222,9 @@ jobs:
         if: ${{ contains(fromJSON('["production", "beta"]'), inputs.stage) }}
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.PROD_AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.PROD_AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.PROD_AWS_REGION }}
+          aws-access-key-id: ${{ secrets.MAIN_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.MAIN_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.MAIN_AWS_REGION }}
       
       - name: Sync environment variables 
         id: sync-environment-variables
@@ -270,7 +278,8 @@ jobs:
 
           STG_KEY="${STAGE/staging/stg}"
           ARTIFACT="cor-stg-us1-ms-web-${STG_KEY}-${SHORT_COMMIT}.tar.gz"
-          S3_URI="s3://cor-stg-us1-ms-web-all/${STG_KEY}/${ARTIFACT}"
+          S3_KEY="${STG_KEY}/${ARTIFACT}"
+          S3_URI="s3://cor-stg-us1-ms-web-all/${S3_KEY}"
           CDN_BUCKET=$(grep '^CDN_Bucket=' .env | cut -d= -f2- | tr -d '"' | tr -d "'")
           CDN_UPLOAD_FOLDER=$(grep '^AWS_CDN_ASSET_UPLOAD_FOLDER=' .env | cut -d= -f2- | tr -d '"' | tr -d "'")
           CDN_REGION="${CDN_REGION:-us-east-1}"
@@ -298,6 +307,9 @@ jobs:
 
           echo "ARTIFACT=${ARTIFACT}" >> "$GITHUB_ENV"
           echo "ARTIFACT_S3_URI=${S3_URI}" >> "$GITHUB_ENV"
+          echo "ARTIFACT_S3_KEY=${S3_KEY}" >> "$GITHUB_ENV"
+          echo "ARTIFACT_S3_URI=${S3_URI}" >> "$GITHUB_OUTPUT"
+          echo "ARTIFACT_S3_KEY=${S3_KEY}" >> "$GITHUB_OUTPUT"
           echo "ARTIFACT_EXISTS=${ARTIFACT_EXISTS}" >> "$GITHUB_ENV"
           echo "ASSETS_EXIST=${ASSETS_EXIST}" >> "$GITHUB_ENV"
 
@@ -389,6 +401,10 @@ jobs:
               --exclude='.infra/terraform' \
               --exclude='.infra/*.json' \
               --exclude='assume-role-output.json' \
+              --exclude='artifact-output' \
+              --exclude='.env' \
+              --exclude='.version' \
+              --exclude='.git' \
               .
           )
 

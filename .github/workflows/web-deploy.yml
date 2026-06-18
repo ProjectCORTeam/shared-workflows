@@ -1,424 +1,81 @@
-name: AWS Deploy
+name: Web Custom Build
+
 on: 
   workflow_call:
     inputs: 
       trigger_type:
         required: true
         type: string
-      runner:
-        required: false
-        type: string
-        default: 'ubuntu-latest'
-      env_check:
-        required: false
-        type: string
-        description: "Environment status checker"
-      new_stage:
-        required: false
-        type: string
-        description: "New stage for deploy check flag"
-        default: "false"
-      stage:
+      artifact_s3_uri:
         required: true
         type: string
-        description: "Stage name for infrastructure deployment"
-      release_version:
+      artifact_s3_key:
         required: true
         type: string
-        description: "Semantic versioning for production environment"
       notifications:
         required: false
         type: boolean
         default: true
         description: "Enable notifications to cloud or team owner flag"
-      infra_templates_version:
-          required: false
-          type: string
-          default: feat/dynamic-templates-init
-          description: "Infra template version for get all configuration files"
-      infra_terraform_version:
-        required: false
-        type: string
-        default: 1.7.4
-        description: "Terraform version client"
-      branching_mode:
-        required: false
-        type: string
-        default: gitflow
-        description: "Repository branching strategy"
-      only_plan:
-          required: false
-          type: boolean
-          default: false
-          description: "Plan terraform changes flag"
+      
     secrets: 
-      CICD_AWS_ACCESS_KEY_ID:
+      MAIN_AWS_ACCESS_KEY_ID:
         required: true
-      CICD_AWS_SECRET_ACCESS_KEY:
+      MAIN_AWS_SECRET_ACCESS_KEY:
         required: true
-      CICD_AWS_REGION:
+      MAIN_AWS_REGION:
+        required: true
+      STG_AWS_ACCESS_KEY_ID:
+        required: true
+      STG_AWS_SECRET_ACCESS_KEY:
+        required: true
+      STG_AWS_REGION:
+        required: true
+      PROD_AWS_ACCESS_KEY_ID:
+        required: true
+      PROD_AWS_SECRET_ACCESS_KEY:
+        required: true
+      PROD_AWS_REGION:
+        required: true
+      SHARED_AWS_ACCESS_KEY_ID:
+        required: true
+      SHARED_AWS_SECRET_ACCESS_KEY:
+        required: true
+      SHARED_AWS_REGION:
         required: true
       GOOGLE_WEBHOOK:
         required: true
-      TF_API_TOKEN:
-        required: true
-      ACTIONS_TOKEN:
-        required: true
 
 jobs:
-  helm:
-    name: Helm
-    runs-on: ${{ inputs.runner }}
+
+  aws_codedeploy_deploy:
+    runs-on: ubuntu-latest
     environment:
-      name: ${{ inputs.stage }}
-    steps: 
-      - name: Configure AWS Credentials - INFRA
+      name: ${{ vars.CODEDEPLOY_DEPLOYMENT_GROUP }}
+    name: AWS CodeDeploy Deploy
+    steps:
+      - name: Configure AWS Credentials
+        if: ${{ contains(fromJSON('["production", "beta"]'), vars.CODEDEPLOY_DEPLOYMENT_GROUP) }}
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.INFRA_AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.INFRA_AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.INFRA_AWS_REGION }}
-      
-      - name: Sync infra config 
-        id: sync-infra-config
-        run: |
-          echo ${{ github.repository }}
-          aws s3 ls
-          mkdir -p infra-config/.infra
-          aws s3 cp s3://cor-infra-us-east-2-services-configs/${{ github.repository }}.json ./infra-config/.infra/infra-config.json
+          aws-access-key-id: ${{ secrets.MAIN_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.MAIN_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.MAIN_AWS_REGION }}
 
-      - name: Configure AWS Credentials - STG
-        if: ${{ contains(inputs.stage, 'staging') }}
+      - name: Configure AWS Credentials
+        if: ${{ contains(fromJSON('["stg"]'), vars.CODEDEPLOY_DEPLOYMENT_GROUP) }}
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.STG_AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.STG_AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.STG_AWS_REGION }}
 
-      - name: Authenticate with EKS - Staging
-        if: ${{ contains(inputs.stage, 'staging') }}
+      # Step 4: Tell AWS CodeDeploy to start the deployment
+      - name: Trigger AWS CodeDeploy
         run: |
-          aws eks update-kubeconfig --name cor-staging-us-east-1-main --region us-east-1
-        env:
-          KUBECONFIG: /home/runner/.kube/config
-
-      - name: Configure AWS Credentials - PROD
-        if: ${{ contains(fromJSON('["production", "beta"]'), inputs.stage) }}
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.PROD_AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.PROD_AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.PROD_AWS_REGION }}
-
-      - name: Authenticate with EKS - Prod
-        if: ${{ contains(fromJSON('["production", "beta"]'), inputs.stage) }}
-        run: |
-          aws eks update-kubeconfig --name cor-prod-us-east-2-all --region us-east-2
-        env:
-          KUBECONFIG: /home/runner/.kube/config
-
-      - name: Install Helm
-        if: contains(inputs.runner, 'k8s-runners-stg')
-        uses: azure/setup-helm@v4.3.0
-        with:
-          version: 'latest' # default is latest (stable)
-
-      - name: Install or Upgrade Helm Chart
-        env:
-          STAGE_INPUT: ${{ inputs.stage }}
-          KUBECONFIG: /home/runner/.kube/config
-        run: |
-          SERVICE_NAME=$(jq -r '.name' infra-config/.infra/infra-config.json)  
-          SERVICE_TYPE=$(jq -r '.type' infra-config/.infra/infra-config.json | tr '[:upper:]' '[:lower:]')
-          
-          # Configurar el nombre del namespace
-          if [[ "$STAGE_INPUT" =~ ^staging([1-9]|10)$ ]]; then
-            K8S_NAMESPACE="${STAGE_INPUT/staging/staging-}"
-          else
-            K8S_NAMESPACE="$STAGE_INPUT"
-          fi
-          echo "Kubernetes namespace is: $K8S_NAMESPACE"
-
-          # Añadir el repositorio de Helm
-          helm repo add cor https://chartmuseum.shared.projectcor.com
-          helm repo update
-
-          # Ejecutar el upgrade/install de Helm
-          helm upgrade --install $SERVICE_TYPE-$SERVICE_NAME-$K8S_NAMESPACE \
-            cor/$SERVICE_TYPE-$SERVICE_NAME \
-            --version ${{ inputs.release_version }} \
-            --namespace $K8S_NAMESPACE --atomic --reuse-values --timeout 8m
-  terraform:
-    name: "Terraform"
-    runs-on: ${{ inputs.runner }}
-    environment:
-      name: ${{ inputs.stage }}
-    if: false
-    steps:
-      - name: Cache Terraform files
-        uses: actions/cache@v4
-        with:
-          path: |
-            .infra/terraform/.terraform
-          key: terraform-${{ inputs.stage }}
-
-      - id: install-aws-cli
-        if: contains( inputs.runner, 'k8s-runners-stg' )
-        uses: unfor19/install-aws-cli-action@v1
-        with:
-          version: 2     # default
-          verbose: false # default
-          arch: amd64    # allowed values: amd64, arm64
-
-      - name: Install Terraform
-        if: contains( inputs.runner, 'k8s-runners-stg' )
-        uses: little-core-labs/install-terraform@v2.0.0
-        with:
-            version: ${{ inputs.infra_terraform_version }}
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 18
-
-      - name: Setup Terraform
-        shell: bash
-        run: |
-          cat >~/.terraformrc <<EOL
-          credentials "app.terraform.io" {
-            token = "${{ secrets.TF_API_TOKEN }}"
-          }
-          EOL
-          #echo "TF_PLUGIN_CACHE_DIR=$HOME/.terraform.d/plugin-cache" >>"$GITHUB_ENV"
-          #mkdir --parents "$HOME/.terraform.d/plugin-cache"
-
-      - name: Import Templates
-        uses: actions/checkout@v4
-        with:
-          repository: ProjectCORTeam/infra-service-templates
-          ref: ${{ inputs.infra_templates_version }}
-          path: infra-templates
-          token: ${{ secrets.ACTIONS_TOKEN }}
-          sparse-checkout: |
-            templates
-          fetch-depth: 1
-
-      - name: Import service infra config
-        uses: actions/checkout@v4
-        with:
-          path: infra-config
-          sparse-checkout: |
-            .infra/
-          fetch-depth: 1
-
-      - name: Configure AWS Credentials - INFRA
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.INFRA_AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.INFRA_AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.INFRA_AWS_REGION }}
-  
-      - name: Sync infra config 
-        id: sync-infra-config
-        run: |
-          aws s3 cp s3://cor-infra-us-east-2-services-configs/${{ github.repository }}.json ./infra-config/.infra/infra-config.json
-
-      - name: Setup Infra service files
-        shell: bash
-        run: |
-
-          if [ ! -d ".infra" ]; then
-            mkdir .infra
-          fi
-        
-          cp ./infra-config/.infra/infra-config.json .infra/infra-config.json
-
-          SERVICE_NAME=$(jq -r '.name' .infra/infra-config.json)  
-          INFRA_TYPE=$(jq -r '.deployment_type' .infra/infra-config.json | tr '[:upper:]' '[:lower:]')
-          SERVICE_TYPE=$(jq -r '.type' .infra/infra-config.json)  
-          SERVICE_OWNER=$(jq -r '.owner_team' .infra/infra-config.json)  
-          
-          echo -e "\033[32mSincronizando archivos...........\033[0m"
-          # rsync -av --progress ./infra-templates/templates/simple-service-persistence/base/* .infra 
-          rsync -av --progress ./infra-templates/templates/simple-service-persistence/simple-$INFRA_TYPE/* .infra --exclude infra-config.json
-        
-          echo -e "\033[32mOverride terraform files...........\033[0m"
-          rsync -av --progress ./infra-config/.infra/* .infra --exclude infra-config.json
-
-          cp -a ./infra-templates/templates/simple-service-persistence/base/* .infra/
-          #find ./infra-templates/templates/simple-service-persistence/simple-$INFRA_TYPE/ -type f ! -name 'infra-config.json' -exec cp {} .infra/ \;
-
-          echo -e "\033[32mConfigurando archivos...........033[0m"
-          find ./ -type f -exec sed -i "s/\$TEMPLATE_SERVICE_TYPE/$SERVICE_TYPE/g" {} +
-          find ./ -type f -exec sed -i "s/\$TEMPLATE_SERVICE_NAME/$SERVICE_NAME/g" {} +
-          find ./ -type f -exec sed -i "s/\$TEMPLATE_SERVICE_OWNER_TEAM/$SERVICE_OWNER/g" {} +
-
-      - name: Input checks
-        shell: bash
-        run: |
-          echo "github_event: "${{github.event_name }}
-          echo "github_branch: "${{github.ref}}
-          echo "runner: "${{ inputs.runner }}
-          echo "new_stage: "${{ inputs.new_stage }}
-          echo "stage: "${{inputs.stage}}
-          echo "release_version: "${{inputs.release_version}}
-
-      - name: Configure AWS Credentials - Terraform
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.TF_AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.TF_AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.TF_AWS_REGION }}
-
-      - name: Set Global Terraform Variables
-        shell: bash
-        run: |
-          export TF_VAR_account_id_list='${{secrets.TF_VAR_ACCOUNT_ID_LIST}}'
-          export TF_VAR_terraform_role_name="${{secrets.TF_VAR_TERRAFORM_ROLE_NAME}}"
-          export TF_VAR_github_token="${{secrets.TF_VAR_GITHUB_TOKEN}}"
-          echo TF_VAR_account_id_list
-          echo TF_VAR_terraform_role_name
-
-      - name: Generate terraform.auto.tfvars for environment
-        id: tfvars_generator
-        shell: bash
-        working-directory: .infra
-        run: |
-          if [ ${{inputs.STAGE}} == 'production' ] || [ ${{inputs.STAGE}} == 'beta' ]; then \
-            #jq --argjson new_env '{"new_env": ${{ inputs.new_stage }}' --arg commit_id "${GITHUB_SHA::7}" --arg version ${{inputs.release_version}} '.commit_id += $commit_id | (.env_settings[]) += {new_env: false} | .env_settings |= map(if .stage == "${{inputs.STAGE}}" then . += $new_env + {release_version: $version} else . end)' infra-config.json > ./terraform/terraform.auto.tfvars.json              
-            jq --arg new_env "${{ inputs.new_stage }}" \
-                --arg commit_id "${GITHUB_SHA::7}" \
-                --arg version "${{ inputs.release_version }}" \
-                '.commit_id += $commit_id | 
-                  .env_settings[] += {"new_env": false} | 
-                  .env_settings |= map(if .stage == "${{inputs.STAGE}}" then . += {"new_env": $new_env, "release_version": $version} else . end)' \
-                infra-config.json > ./terraform/terraform.auto.tfvars.json
-          else \
-            #jq --argjson new_env '{"new_env": ${{ inputs.new_stage }}' --arg commit_id "$(git rev-parse --short HEAD)" '.commit_id += $commit_id | (.env_settings[]) += {new_env: false} | .env_settings |= map(if .stage == "${{inputs.STAGE}}" then . += $new_env else . end)' infra-config.json > ./terraform/terraform.auto.tfvars.json
-            jq --arg new_env "${{ inputs.new_stage }}" \
-              --arg commit_id "${GITHUB_SHA::7}" \
-              '.commit_id = $commit_id | 
-                .env_settings[] += {"new_env": $new_env} | 
-                .env_settings |= map(.new_env = false)' \
-              infra-config.json > ./terraform/terraform.auto.tfvars.json
-          fi
-          terraform fmt
-          cat ./terraform/terraform.auto.tfvars.json
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3.0.0
-        with:
-          terraform_version: ${{ inputs.infra_terraform_version }}
-          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
-
-      - name: Terraform Format
-        id: fmt
-        run: |
-          terraform fmt -check -recursive -diff
-        working-directory: ${{ github.workspace	}}/.infra/terraform
-
-      - name: Terraform Init
-        id: init
-        run: terraform init                    
-        working-directory: ${{ github.workspace	}}/.infra/terraform
-      
-      - name: Terraform Validate
-        id: validate
-        run: terraform validate -no-color
-        working-directory: .infra/terraform
-
-      - name: Terraform Apply Staging
-        if: ${{ !contains(fromJSON('["production", "beta"]'), inputs.stage) }}
-        id: infra-apply-staging
-        run: |
-          terraform apply -auto-approve -input=false \
-          -target='module.shared' \
-          -target='module.staging["${{ inputs.stage }}"]' \
-          -var="account_id_list=${{secrets.TF_VAR_ACCOUNT_ID_LIST}}" \
-          -var="terraform_role_name=${{secrets.TF_VAR_TERRAFORM_ROLE_NAME}}" \
-          -var="github_token=${{secrets.TF_VAR_GITHUB_TOKEN}}"
-        working-directory: .infra/terraform
-
-      - name: Google Chat Notification - Staging
-        if: ${{ !contains(fromJSON('["production", "beta"]'), inputs.stage) }}
-        uses: nakamuraos/google-chat-notifications@v2.1.0
-        with:
-          title: Infrastructure Apply
-          subtitle: Staging - ${{ inputs.stage }}
-          webhookUrl: ${{ secrets.GOOGLE_WEBHOOK }}
-          status: ${{ steps.infra-apply-staging.outcome }}
-
-      - name: Terraform Plan Beta
-        if: contains( inputs.stage, 'beta' ) && inputs.only_plan
-        id: plan-beta
-        run: |
-          terraform plan -no-color -input=false \
-          -target='module.shared' \
-          -target='module.prod["beta"]' \
-          -var="account_id_list=${{secrets.TF_VAR_ACCOUNT_ID_LIST}}" \
-          -var="terraform_role_name=${{secrets.TF_VAR_TERRAFORM_ROLE_NAME}}" \
-          -var="github_token=${{secrets.TF_VAR_GITHUB_TOKEN}}"
-        continue-on-error: true
-        working-directory: .infra/terraform
-      
-      - name: Terraform Plan Prod
-        if: contains( inputs.stage, 'production' ) && inputs.only_plan
-        id: plan-prod
-        run: | 
-          terraform plan -no-color -input=false \
-          -target='module.shared' \
-          -target='module.prod["production"]' \
-          -var="account_id_list=${{secrets.TF_VAR_ACCOUNT_ID_LIST}}" \
-          -var="terraform_role_name=${{secrets.TF_VAR_TERRAFORM_ROLE_NAME}}" \
-          -var="github_token=${{secrets.TF_VAR_GITHUB_TOKEN}}"
-        continue-on-error: true
-        working-directory: .infra/terraform
-
-      - name: Terraform Plan Beta Status
-        if: steps.plan-beta.outcome == 'failure'
-        run: exit 1
-      
-      - name: Terraform Plan Prod Status
-        if: steps.plan-prod.outcome == 'failure'
-        run: exit 1
-
-      - name: Terraform Apply Beta
-        if: inputs.stage == 'beta' && !inputs.only_plan
-        id: infra-apply-beta
-        run: |
-          terraform apply -auto-approve -input=false \
-          -target='module.shared' \
-          -target='module.prod["beta"]' \
-          -var="account_id_list=${{secrets.TF_VAR_ACCOUNT_ID_LIST}}" \
-          -var="terraform_role_name=${{secrets.TF_VAR_TERRAFORM_ROLE_NAME}}" \
-          -var="github_token=${{secrets.TF_VAR_GITHUB_TOKEN}}"        
-        working-directory: .infra/terraform
-
-      - name: Terraform Apply Prod
-        if: inputs.stage == 'production' && !inputs.only_plan
-        id: infra-apply-production
-        run: | 
-          terraform apply -auto-approve -input=false \
-          -target='module.shared' \
-          -target='module.prod["production"]'  \
-          -var="account_id_list=${{secrets.TF_VAR_ACCOUNT_ID_LIST}}" \
-          -var="terraform_role_name=${{secrets.TF_VAR_TERRAFORM_ROLE_NAME}}" \
-          -var="github_token=${{secrets.TF_VAR_GITHUB_TOKEN}}"
-        working-directory: .infra/terraform
-
-      # - name: Google Chat Notification - Beta
-      #   if: inputs.stage == 'beta'
-      #   uses: nakamuraos/google-chat-notifications@v2.1.0
-      #   with:
-      #     title: Infrastructure Apply
-      #     subtitle: ${{ inputs.stage }}
-      #     webhookUrl: ${{ secrets.GOOGLE_WEBHOOK }}
-      #     status: ${{ steps.infra-apply-beta.outcome }}
-
-      # - name: Google Chat Notification - Production
-      #   if: inputs.stage == 'production'
-      #   uses: nakamuraos/google-chat-notifications@v2.1.0
-      #   with:
-      #     title: Infrastructure Apply
-      #     subtitle: ${{ inputs.stage }}
-      #     webhookUrl: ${{ secrets.GOOGLE_WEBHOOK }}
-      #     status: ${{ steps.infra-apply-production.outcome }}
+          aws deploy create-deployment \
+            --application-name ${{ vars.CODEDEPLOY_APP_NAME }} \
+            --deployment-config-name CodeDeployDefault.OneAtATime \
+            --deployment-group-name ${{ vars.CODEDEPLOY_DEPLOYMENT_GROUP }} \
+            --s3-location bucket=${{ vars.CODEDEPLOY_S3_ARTIFACTS }},bundleType=tar.gz,key=${{ inputs.artifact_s3_key }} \
+            --description "Deployment triggered by GitHub Actions commit ${{ github.sha }}"
