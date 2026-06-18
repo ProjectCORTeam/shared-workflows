@@ -396,6 +396,7 @@ jobs:
             tar -czf "../${ARTIFACT}" \
               --exclude='node_modules' \
               --exclude='storage' \
+              --exclude='vendor' \
               --exclude='.infra/cicd' \
               --exclude='.infra/kubernetes' \
               --exclude='.infra/terraform' \

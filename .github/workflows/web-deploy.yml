@@ -90,11 +90,38 @@ jobs:
           aws-region: ${{ secrets.STG_AWS_REGION }}
 
       - name: Trigger AWS CodeDeploy
+        id: codedeploy
         run: |
-
-          aws deploy create-deployment \
+          DEPLOYMENT_ID=$(aws deploy create-deployment \
             --application-name "${CODEDEPLOY_APP_NAME}" \
             --deployment-config-name CodeDeployDefault.OneAtATime \
             --deployment-group-name "${CODEDEPLOY_DEPLOYMENT_GROUP}" \
             --s3-location "bucket=${CODEDEPLOY_S3_ARTIFACTS},bundleType=tgz,key=${ARTIFACT_S3_KEY}" \
-            --description "Deployment triggered by GitHub Actions commit ${{ github.sha }}"
+            --description "Deployment triggered by GitHub Actions commit ${{ github.sha }}" \
+            --query deploymentId \
+            --output text)
+
+          echo "deployment_id=${DEPLOYMENT_ID}" >> "$GITHUB_OUTPUT"
+
+      - name: Output summary
+        if: always()
+        run: |
+          echo "### Deploy Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Stage:** ${{ inputs.stage }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Commit:** \`${{ github.sha }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Trigger:** ${{ inputs.trigger_type }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **CodeDeploy App:** ${CODEDEPLOY_APP_NAME}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Deployment Group:** ${CODEDEPLOY_DEPLOYMENT_GROUP}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Artifact S3 URI:** ${{ inputs.artifact_s3_uri }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Artifact S3 Key:** ${ARTIFACT_S3_KEY}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **S3 Artifacts:** ${CODEDEPLOY_S3_ARTIFACTS}" >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ -n "${{ steps.codedeploy.outputs.deployment_id }}" ]]; then
+            echo "- **Deployment ID:** \`${{ steps.codedeploy.outputs.deployment_id }}\`" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "✅ CodeDeploy deployment triggered successfully." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "❌ CodeDeploy deployment was not triggered." >> "$GITHUB_STEP_SUMMARY"
+          fi
