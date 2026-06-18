@@ -96,5 +96,5 @@ jobs:
             --application-name "${CODEDEPLOY_APP_NAME}" \
             --deployment-config-name CodeDeployDefault.OneAtATime \
             --deployment-group-name "${CODEDEPLOY_DEPLOYMENT_GROUP}" \
-            --s3-location "bucket=${CODEDEPLOY_S3_ARTIFACTS},bundleType=tar.gz,key=${ARTIFACT_S3_KEY}" \
+            --s3-location "bucket=${CODEDEPLOY_S3_ARTIFACTS},bundleType=tgz,key=${ARTIFACT_S3_KEY}" \
             --description "Deployment triggered by GitHub Actions commit ${{ github.sha }}"
