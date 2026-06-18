@@ -14,6 +14,11 @@ on:
         type: boolean
         default: true
         description: "Enable notifications to cloud or team owner flag"
+      force_build:
+        required: false
+        type: boolean
+        default: false
+        description: "Force build even if artifact and assets already exist"
 
     outputs:
       env_check:
@@ -246,40 +251,6 @@ jobs:
           echo "Final release version: $RELEASE_VERSION"
           echo "Environment: $RUN_ENV"
 
-      - name: Configure AWS Credentials - Shared (for ECR)
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.SHARED_AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.SHARED_AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.SHARED_AWS_REGION }}
-
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
-        with:
-          mask-password: 'true'
-
-      - name: Download base image from ECR
-        id: download-base-image
-        run: |
-          docker pull 170071165762.dkr.ecr.us-east-2.amazonaws.com/cor-shared-us-east-2-ms-web-base:latest
-
-      - name: Configure AWS Credentials for artifact upload
-        if: ${{ contains(inputs.stage, 'staging') }}
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.STG_AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.STG_AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.STG_AWS_REGION }}
-
-      - name: Configure AWS Credentials for artifact upload
-        if: ${{ contains(fromJSON('["production", "beta"]'), inputs.stage) || inputs.stage == '' }}
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.PROD_AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.PROD_AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.PROD_AWS_REGION }}
-
       - name: Prepare .env for build
         run: |
           echo "${{ needs.sets-variables.outputs.SHORT_COMMIT_HASH }}" > .version
@@ -287,19 +258,105 @@ jobs:
           sed -i 's/\r//' .env
           sed -i "s/{{VERSION}}/${VERSION}/g" .env
 
-      - name: Build artifacts with Docker and upload to S3
-        id: build-artifacts
+      - name: Check existing artifact and assets
+        id: check-existing-build
         env:
           STAGE: ${{ needs.sets-variables.outputs.STAGE }}
           STAGE_SHORT: ${{ needs.sets-variables.outputs.STAGE_SHORT }}
+          SHORT_COMMIT: ${{ needs.sets-variables.outputs.SHORT_COMMIT_HASH }}
+        run: |
+          set -euo pipefail
+
+          STG_KEY="${STAGE/staging/stg}"
+          ARTIFACT="cor-stg-us1-ms-web-${STG_KEY}-${SHORT_COMMIT}.tar.gz"
+          S3_URI="s3://cor-stg-us1-ms-web-all/${STG_KEY}/${ARTIFACT}"
+          CDN_BUCKET=$(grep '^CDN_Bucket=' .env | cut -d= -f2- | tr -d '"' | tr -d "'")
+          CDN_UPLOAD_FOLDER=$(grep '^AWS_CDN_ASSET_UPLOAD_FOLDER=' .env | cut -d= -f2- | tr -d '"' | tr -d "'")
+          CDN_REGION="${CDN_REGION:-us-east-1}"
+
+          ARTIFACT_EXISTS=false
+          ASSETS_EXIST=false
+
+          if aws s3 ls "${S3_URI}" >/dev/null 2>&1; then
+            echo "Artifact already exists: ${S3_URI}"
+            ARTIFACT_EXISTS=true
+          else
+            echo "Artifact not found: ${S3_URI}"
+          fi
+
+          if [[ -n "${CDN_BUCKET}" && -n "${CDN_UPLOAD_FOLDER}" ]]; then
+            if aws s3 ls "s3://${CDN_BUCKET}/${CDN_UPLOAD_FOLDER}" --region "${CDN_REGION}" 2>/dev/null | grep -q .; then
+              echo "Assets already exist: s3://${CDN_BUCKET}/${CDN_UPLOAD_FOLDER}"
+              ASSETS_EXIST=true
+            else
+              echo "Assets not found: s3://${CDN_BUCKET}/${CDN_UPLOAD_FOLDER}"
+            fi
+          else
+            echo "CDN_Bucket or AWS_CDN_ASSET_UPLOAD_FOLDER missing in .env; skipping assets check"
+          fi
+
+          echo "ARTIFACT=${ARTIFACT}" >> "$GITHUB_ENV"
+          echo "ARTIFACT_S3_URI=${S3_URI}" >> "$GITHUB_ENV"
+          echo "ARTIFACT_EXISTS=${ARTIFACT_EXISTS}" >> "$GITHUB_ENV"
+          echo "ASSETS_EXIST=${ASSETS_EXIST}" >> "$GITHUB_ENV"
+
+          if [[ "${{ inputs.force_build }}" == "true" ]]; then
+            echo "Build forced by input"
+            echo "BUILD_REQUIRED=true" >> "$GITHUB_ENV"
+          elif [[ "${RUN_ENV}" == "staging" && "${ARTIFACT_EXISTS}" == "true" && "${ASSETS_EXIST}" == "true" ]]; then
+            echo "Artifact and assets already exist; skipping build"
+            echo "BUILD_REQUIRED=false" >> "$GITHUB_ENV"
+          else
+            echo "Build required"
+            echo "BUILD_REQUIRED=true" >> "$GITHUB_ENV"
+          fi
+
+      - name: Configure AWS Credentials - Shared (for ECR)
+        if: env.BUILD_REQUIRED == 'true'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.SHARED_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.SHARED_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.SHARED_AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        if: env.BUILD_REQUIRED == 'true'
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+        with:
+          mask-password: 'true'
+
+      - name: Download base image from ECR
+        if: env.BUILD_REQUIRED == 'true'
+        id: download-base-image
+        run: |
+          docker pull 170071165762.dkr.ecr.us-east-2.amazonaws.com/cor-shared-us-east-2-ms-web-base:latest
+
+      - name: Configure AWS Credentials for artifact upload
+        if: env.BUILD_REQUIRED == 'true' && contains(inputs.stage, 'staging')
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.STG_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.STG_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.STG_AWS_REGION }}
+
+      - name: Configure AWS Credentials for artifact upload
+        if: env.BUILD_REQUIRED == 'true' && (contains(fromJSON('["production", "beta"]'), inputs.stage) || inputs.stage == '')
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.PROD_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.PROD_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.PROD_AWS_REGION }}
+
+      - name: Build artifacts with Docker and upload to S3
+        if: env.BUILD_REQUIRED == 'true'
+        id: build-artifacts
         run: |
           set -euo pipefail
 
           IMAGE_TAG="cor-web-build:${RELEASE_VERSION}"
-          SHORT_COMMIT=$(git rev-parse --short HEAD)
-          STG_KEY="${STAGE/staging/stg}"
-          ARTIFACT="cor-stg-us1-ms-web-${STG_KEY}-${SHORT_COMMIT}.tar.gz"
-          S3_URI="s3://cor-stg-us1-ms-web-all/${STG_KEY}/${ARTIFACT}"
+          ARTIFACT="${{ env.ARTIFACT }}"
+          S3_URI="${{ env.ARTIFACT_S3_URI }}"
 
           echo "Building Docker image ${IMAGE_TAG}..."
           docker build \
@@ -337,8 +394,6 @@ jobs:
           echo "Uploading artifact to ${S3_URI}..."
           aws s3 cp "${ARTIFACT}" "${S3_URI}"
 
-          echo "ARTIFACT=${ARTIFACT}" >> "$GITHUB_ENV"
-          echo "ARTIFACT_S3_URI=${S3_URI}" >> "$GITHUB_ENV"
           echo "artifact=${ARTIFACT}" >> "$GITHUB_OUTPUT"
           echo "artifact_s3_uri=${S3_URI}" >> "$GITHUB_OUTPUT"
 
@@ -348,11 +403,20 @@ jobs:
           echo "env_check=success" >> $GITHUB_OUTPUT
 
       - name: Google Chat Notification - Build Success
-        if: inputs.notifications
+        if: inputs.notifications && env.BUILD_REQUIRED == 'true'
         uses: nakamuraos/google-chat-notifications@v2.1.0
         with:
           title: Build Success
           subtitle: ${{ env.RELEASE_VERSION }}
+          webhookUrl: ${{ secrets.GOOGLE_WEBHOOK }}
+          status: 'success'
+
+      - name: Google Chat Notification - Build Skipped
+        if: inputs.notifications && env.BUILD_REQUIRED == 'false'
+        uses: nakamuraos/google-chat-notifications@v2.1.0
+        with:
+          title: Build Skipped
+          subtitle: ${{ env.RELEASE_VERSION }} already exists
           webhookUrl: ${{ secrets.GOOGLE_WEBHOOK }}
           status: 'success'
 
@@ -363,5 +427,9 @@ jobs:
           echo "- **Stage:** ${{ needs.sets-variables.outputs.STAGE }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Release Version:** ${{ env.RELEASE_VERSION }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Environment:** ${{ env.RUN_ENV }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Build Required:** ${{ env.BUILD_REQUIRED }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Build Forced:** ${{ inputs.force_build }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Artifact Exists:** ${{ env.ARTIFACT_EXISTS }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Assets Exist:** ${{ env.ASSETS_EXIST }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Artifact:** ${{ env.ARTIFACT }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Artifact S3 URI:** ${{ env.ARTIFACT_S3_URI }}" >> $GITHUB_STEP_SUMMARY
