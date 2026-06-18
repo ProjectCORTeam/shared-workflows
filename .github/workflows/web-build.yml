@@ -404,7 +404,6 @@ jobs:
               --exclude='assume-role-output.json' \
               --exclude='artifact-output' \
               --exclude='.env' \
-              --exclude='.version' \
               --exclude='.git' \
               .
           )
