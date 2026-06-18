@@ -19,11 +19,11 @@ on:
         description: "Enable notifications to cloud or team owner flag"
       
     secrets: 
-      MAIN_AWS_ACCESS_KEY_ID:
+      AWS_ACCESS_KEY_ID:
         required: true
-      MAIN_AWS_SECRET_ACCESS_KEY:
+      AWS_SECRET_ACCESS_KEY:
         required: true
-      MAIN_AWS_REGION:
+      AWS_REGION:
         required: true
       STG_AWS_ACCESS_KEY_ID:
         required: true
@@ -58,9 +58,9 @@ jobs:
         if: ${{ contains(fromJSON('["production", "beta"]'), vars.CODEDEPLOY_DEPLOYMENT_GROUP) }}
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.MAIN_AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.MAIN_AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.MAIN_AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Configure AWS Credentials
         if: ${{ contains(fromJSON('["stg"]'), vars.CODEDEPLOY_DEPLOYMENT_GROUP) }}
