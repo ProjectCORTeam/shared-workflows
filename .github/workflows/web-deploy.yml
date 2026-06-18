@@ -1,4 +1,4 @@
-name: Web Custom Build
+name: Web Deploy
 
 on: 
   workflow_call:
@@ -51,9 +51,30 @@ jobs:
   aws_codedeploy_deploy:
     runs-on: ubuntu-latest
     environment:
-      name: ${{ vars.CODEDEPLOY_DEPLOYMENT_GROUP }}
+      name: ${{ github.environment }}
     name: AWS CodeDeploy Deploy
+    env:
+      CODEDEPLOY_APP_NAME: ${{ vars.CODEDEPLOY_APP_NAME }}
+      CODEDEPLOY_DEPLOYMENT_GROUP: ${{ vars.CODEDEPLOY_DEPLOYMENT_GROUP }}
+      CODEDEPLOY_S3_ARTIFACTS: ${{ vars.CODEDEPLOY_S3_ARTIFACTS }}
+      ARTIFACT_S3_KEY: ${{ inputs.artifact_s3_key }}
     steps:
+      - name: Validate environment variables
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${{ github.environment }}" ]]; then
+            echo "ERROR: No GitHub Environment configured."
+            echo "Set 'environment: staging' on the job that calls web-deploy.yml."
+            exit 1
+          fi
+
+          if [[ -z "${CODEDEPLOY_APP_NAME}" || -z "${CODEDEPLOY_DEPLOYMENT_GROUP}" || -z "${CODEDEPLOY_S3_ARTIFACTS}" ]]; then
+            echo "ERROR: Missing CodeDeploy variables in GitHub Environment '${{ github.environment }}'."
+            echo "Configure CODEDEPLOY_APP_NAME, CODEDEPLOY_DEPLOYMENT_GROUP and CODEDEPLOY_S3_ARTIFACTS in the caller repo."
+            exit 1
+          fi
+
       - name: Configure AWS Credentials
         if: ${{ contains(fromJSON('["production", "beta"]'), vars.CODEDEPLOY_DEPLOYMENT_GROUP) }}
         uses: aws-actions/configure-aws-credentials@v4
@@ -63,19 +84,19 @@ jobs:
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Configure AWS Credentials
-        if: ${{ contains(fromJSON('["stg"]'), vars.CODEDEPLOY_DEPLOYMENT_GROUP) }}
+        if: ${{ startsWith(vars.CODEDEPLOY_DEPLOYMENT_GROUP, 'stg') }}
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.STG_AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.STG_AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.STG_AWS_REGION }}
 
-      # Step 4: Tell AWS CodeDeploy to start the deployment
       - name: Trigger AWS CodeDeploy
         run: |
+
           aws deploy create-deployment \
-            --application-name ${{ vars.CODEDEPLOY_APP_NAME }} \
+            --application-name "${CODEDEPLOY_APP_NAME}" \
             --deployment-config-name CodeDeployDefault.OneAtATime \
-            --deployment-group-name ${{ vars.CODEDEPLOY_DEPLOYMENT_GROUP }} \
-            --s3-location bucket=${{ vars.CODEDEPLOY_S3_ARTIFACTS }},bundleType=tar.gz,key=${{ inputs.artifact_s3_key }} \
+            --deployment-group-name "${CODEDEPLOY_DEPLOYMENT_GROUP}" \
+            --s3-location "bucket=${CODEDEPLOY_S3_ARTIFACTS},bundleType=tar.gz,key=${ARTIFACT_S3_KEY}" \
             --description "Deployment triggered by GitHub Actions commit ${{ github.sha }}"
