@@ -102,6 +102,37 @@ jobs:
             --output text)
 
           echo "deployment_id=${DEPLOYMENT_ID}" >> "$GITHUB_OUTPUT"
+          echo "CodeDeploy deployment triggered: ${DEPLOYMENT_ID}"
+
+      - name: Wait for CodeDeploy deployment
+        id: codedeploy-wait
+        run: |
+          set -euo pipefail
+
+          DEPLOYMENT_ID="${{ steps.codedeploy.outputs.deployment_id }}"
+          echo "Waiting for CodeDeploy deployment ${DEPLOYMENT_ID} to complete..."
+
+          if aws deploy wait deployment-successful --deployment-id "${DEPLOYMENT_ID}"; then
+            echo "deployment_status=Succeeded" >> "$GITHUB_OUTPUT"
+            echo "CodeDeploy deployment ${DEPLOYMENT_ID} succeeded."
+            exit 0
+          fi
+
+          DEPLOYMENT_STATUS=$(aws deploy get-deployment \
+            --deployment-id "${DEPLOYMENT_ID}" \
+            --query 'deploymentInfo.status' \
+            --output text)
+
+          DEPLOYMENT_ERROR=$(aws deploy get-deployment \
+            --deployment-id "${DEPLOYMENT_ID}" \
+            --query 'deploymentInfo.errorInformation.message' \
+            --output text)
+
+          echo "deployment_status=${DEPLOYMENT_STATUS}" >> "$GITHUB_OUTPUT"
+          echo "deployment_error=${DEPLOYMENT_ERROR:-Unknown error}" >> "$GITHUB_OUTPUT"
+          echo "CodeDeploy deployment ${DEPLOYMENT_ID} failed with status: ${DEPLOYMENT_STATUS}"
+          echo "Error: ${DEPLOYMENT_ERROR:-Unknown error}"
+          exit 1
 
       - name: Output summary
         if: always()
@@ -119,8 +150,20 @@ jobs:
 
           if [[ -n "${{ steps.codedeploy.outputs.deployment_id }}" ]]; then
             echo "- **Deployment ID:** \`${{ steps.codedeploy.outputs.deployment_id }}\`" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          if [[ "${{ steps.codedeploy-wait.outputs.deployment_status }}" == "Succeeded" ]]; then
+            echo "- **Deployment Status:** Succeeded" >> "$GITHUB_STEP_SUMMARY"
             echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "✅ CodeDeploy deployment triggered successfully." >> "$GITHUB_STEP_SUMMARY"
+            echo "✅ CodeDeploy deployment completed successfully." >> "$GITHUB_STEP_SUMMARY"
+          elif [[ -n "${{ steps.codedeploy-wait.outputs.deployment_status }}" ]]; then
+            echo "- **Deployment Status:** ${{ steps.codedeploy-wait.outputs.deployment_status }}" >> "$GITHUB_STEP_SUMMARY"
+            echo "- **Error:** ${{ steps.codedeploy-wait.outputs.deployment_error }}" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "❌ CodeDeploy deployment failed." >> "$GITHUB_STEP_SUMMARY"
+          elif [[ -n "${{ steps.codedeploy.outputs.deployment_id }}" ]]; then
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "⚠️ CodeDeploy deployment was triggered but did not finish successfully." >> "$GITHUB_STEP_SUMMARY"
           else
             echo "" >> "$GITHUB_STEP_SUMMARY"
             echo "❌ CodeDeploy deployment was not triggered." >> "$GITHUB_STEP_SUMMARY"
