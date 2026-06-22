@@ -480,13 +480,26 @@ jobs:
       - name: Setup Helm ChartMuseum
         run: |
           helm version
-          # helm plugin install https://github.com/chartmuseum/helm-push          
+          # helm plugin install https://github.com/chartmuseum/helm-push
           # helm plugin list
           helm repo add cor https://chartmuseum.shared.projectcor.com
           helm repo update
 
+      - name: Check chart in ChartMuseum
+        id: check-chart
+        run: |
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+            "https://chartmuseum.shared.projectcor.com/api/charts/${{ needs.sets-variables.outputs.SERVICE_TYPE }}-${{ needs.sets-variables.outputs.SERVICE_NAME }}/${{ env.RELEASE_VERSION }}")
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "CHART_EXIST=true" >> $GITHUB_ENV
+            echo "Chart ${{ env.RELEASE_VERSION }} already exists in ChartMuseum"
+          else
+            echo "CHART_EXIST=false" >> $GITHUB_ENV
+            echo "Chart ${{ env.RELEASE_VERSION }} not found in ChartMuseum (HTTP $HTTP_CODE)"
+          fi
+
       - name: Package and Upload Helm Chart (ChartMuseum API)
-        if: inputs.force_build || env.ECR_IMAGE_EXIST == 'false'
+        if: inputs.force_build || env.ECR_IMAGE_EXIST == 'false' || env.CHART_EXIST == 'false'
         env:
           CHARTMUSEUM_URL: https://chartmuseum.shared.projectcor.com #${{ vars.CHARTMUSEUM_URL }}
           #CHARTMUSEUM_USER: ${{ secrets.CHARTMUSEUM_USER }}
