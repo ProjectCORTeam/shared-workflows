@@ -58,18 +58,6 @@ on:
         required: true
       CICD_AWS_REGION:
         required: true
-      INFRA_AWS_ACCESS_KEY_ID:
-        required: true
-      INFRA_AWS_SECRET_ACCESS_KEY:
-        required: true
-      INFRA_AWS_REGION:
-        required: true
-      SHARED_AWS_ACCESS_KEY_ID:
-        required: true
-      SHARED_AWS_SECRET_ACCESS_KEY:
-        required: true
-      SHARED_AWS_REGION:
-        required: true
       GOOGLE_WEBHOOK:
         required: true
       DOCKERHUB_USERNAME:
@@ -82,6 +70,10 @@ on:
       NPM_TOKEN:
         required: true
         description: "Private NPM token"
+
+permissions:
+  id-token: write
+  contents: read
 
 env:
   NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -134,12 +126,11 @@ jobs:
               aws --version
           fi
 
-      - name: Configure AWS Credentials - INFRA
+      - name: Configure AWS Credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.INFRA_AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.INFRA_AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.INFRA_AWS_REGION }}
+          role-to-assume: arn:aws:iam::895242915726:role/cor-role-infra-oidc
+          aws-region: us-east-1
 
       - name: Sync infra config 
         id: sync-infra-config
@@ -297,12 +288,11 @@ jobs:
 #          verbose: false
 #          arch: amd64
 
-      - name: Configure AWS Credentials - INFRA
+      - name: Configure AWS Credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.INFRA_AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.INFRA_AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.INFRA_AWS_REGION }}
+          role-to-assume: arn:aws:iam::895242915726:role/cor-role-infra-oidc
+          aws-region: us-east-1
 
       - name: Check if stage configuration exists
         id: check-stage-config
@@ -369,12 +359,18 @@ jobs:
           echo "Final release version: $RELEASE_VERSION"
           echo "Environment: $RUN_ENV"
 
-      - name: Configure AWS Credentials - Shared (for ECR)
+      - name: Configure AWS Credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.SHARED_AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.SHARED_AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.SHARED_AWS_REGION }}
+          role-to-assume: arn:aws:iam::895242915726:role/cor-role-infra-oidc
+          aws-region: us-east-1
+
+      - name: Configure AWS Credentials (chain -> shared, ECR)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::170071165762:role/cor-role-shared-deploy
+          aws-region: us-east-2
+          role-chaining: true
 
       - name: Login to Amazon ECR
         id: login-ecr
@@ -388,7 +384,7 @@ jobs:
         run: |
           aws ecr describe-images \
             --repository-name cor-shared-us-east-2-${{ needs.sets-variables.outputs.SERVICE_TYPE }}-${{ needs.sets-variables.outputs.SERVICE_NAME }} \
-            --region ${{ secrets.SHARED_AWS_REGION }} \
+            --region us-east-2 \
             --image-ids imageTag=${{ env.RELEASE_VERSION }}
 
       - name: Check ECR image tag outcome
