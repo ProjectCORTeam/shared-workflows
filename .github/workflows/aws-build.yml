@@ -371,6 +371,7 @@ jobs:
           role-to-assume: arn:aws:iam::170071165762:role/cor-role-shared-deploy
           aws-region: us-east-2
           role-chaining: true
+          role-skip-session-tagging: true
 
       - name: Login to Amazon ECR
         id: login-ecr

@@ -97,6 +97,7 @@ jobs:
           role-to-assume: arn:aws:iam::175965032279:role/cor-role-staging-deploy
           aws-region: us-east-1
           role-chaining: true
+          role-skip-session-tagging: true
 
       - name: Authenticate with EKS - Staging
         if: ${{ contains(inputs.stage, 'staging') }}
@@ -112,6 +113,7 @@ jobs:
           role-to-assume: arn:aws:iam::228470217310:role/cor-role-prod-deploy
           aws-region: us-east-2
           role-chaining: true
+          role-skip-session-tagging: true
 
       - name: Authenticate with EKS - Prod
         if: ${{ contains(fromJSON('["production", "beta"]'), inputs.stage) }}
