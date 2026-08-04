@@ -65,6 +65,10 @@ on:
       ACTIONS_TOKEN:
         required: true
 
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
   helm:
     name: Helm
@@ -72,14 +76,13 @@ jobs:
     environment:
       name: ${{ inputs.stage }}
     steps: 
-      - name: Configure AWS Credentials - INFRA
+      - name: Configure AWS Credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.INFRA_AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.INFRA_AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.INFRA_AWS_REGION }}
-      
-      - name: Sync infra config 
+          role-to-assume: arn:aws:iam::895242915726:role/cor-role-infra-oidc
+          aws-region: us-east-1
+
+      - name: Sync infra config
         id: sync-infra-config
         run: |
           echo ${{ github.repository }}
@@ -87,13 +90,14 @@ jobs:
           mkdir -p infra-config/.infra
           aws s3 cp s3://cor-infra-us-east-2-services-configs/${{ github.repository }}.json ./infra-config/.infra/infra-config.json
 
-      - name: Configure AWS Credentials - STG
+      - name: Configure AWS Credentials (chain -> staging)
         if: ${{ contains(inputs.stage, 'staging') }}
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.STG_AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.STG_AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.STG_AWS_REGION }}
+          role-to-assume: arn:aws:iam::175965032279:role/cor-role-staging-deploy
+          aws-region: us-east-1
+          role-chaining: true
+          role-skip-session-tagging: true
 
       - name: Authenticate with EKS - Staging
         if: ${{ contains(inputs.stage, 'staging') }}
@@ -102,13 +106,14 @@ jobs:
         env:
           KUBECONFIG: /home/runner/.kube/config
 
-      - name: Configure AWS Credentials - PROD
+      - name: Configure AWS Credentials (chain -> prod)
         if: ${{ contains(fromJSON('["production", "beta"]'), inputs.stage) }}
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.PROD_AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.PROD_AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.PROD_AWS_REGION }}
+          role-to-assume: arn:aws:iam::228470217310:role/cor-role-prod-deploy
+          aws-region: us-east-2
+          role-chaining: true
+          role-skip-session-tagging: true
 
       - name: Authenticate with EKS - Prod
         if: ${{ contains(fromJSON('["production", "beta"]'), inputs.stage) }}
