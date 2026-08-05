@@ -206,6 +206,38 @@ jobs:
           role-to-assume: ${{ secrets.OIDC_AWS_DEPLOY_ROLE_ARN_INFRA }}
           aws-region: ${{ secrets.OIDC_AWS_REGION_INFRA }}
 
+      - name: Configure AWS Credentials (OIDC) - Security
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_GITHUB_OIDC_ROLE_SEC }}
+          aws-region: us-east-1
+          role-chaining: true
+          role-skip-session-tagging: true
+
+      - name: Sync environment variables
+        id: sync-environment-variables
+        run: |
+          ENV_SECRET_ARN="${{ vars.env_secret_arn }}"
+          if [[ -z "${ENV_SECRET_ARN}" ]]; then
+            echo "ERROR: vars.env_secret_arn is empty."
+            echo "Configure the variable 'env_secret_arn' in GitHub Environment '${{ inputs.stage }}' (repo Web, not shared-workflows)."
+            exit 1
+          fi
+
+          aws secretsmanager get-secret-value \
+            --region us-east-2 \
+            --secret-id "${ENV_SECRET_ARN}" \
+            --query SecretString --output text \
+            | jq -r 'to_entries | .[] | "\(.key)=\(.value)"' > .env
+
+      # Role chaining always starts from the orchestrator's own session, not
+      # from an already-chained one — re-assume it before switching accounts.
+      - name: Configure AWS Credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.OIDC_AWS_DEPLOY_ROLE_ARN_INFRA }}
+          aws-region: ${{ secrets.OIDC_AWS_REGION_INFRA }}
+
       - name: Configure AWS Credentials (OIDC) - Staging
         uses: aws-actions/configure-aws-credentials@v4
         if: ${{ contains(inputs.stage, 'staging') }}
@@ -223,22 +255,6 @@ jobs:
           aws-region: ${{ vars.AWS_GITHUB_OIDC_REGION_PROD }}
           role-chaining: true
           role-skip-session-tagging: true
-      
-      - name: Sync environment variables 
-        id: sync-environment-variables
-        run: |
-          ENV_SECRET_ARN="${{ vars.env_secret_arn }}"
-          if [[ -z "${ENV_SECRET_ARN}" ]]; then
-            echo "ERROR: vars.env_secret_arn is empty."
-            echo "Configure the variable 'env_secret_arn' in GitHub Environment '${{ inputs.stage }}' (repo Web, not shared-workflows)."
-            exit 1
-          fi
-
-          aws secretsmanager get-secret-value \
-            --region us-east-2 \
-            --secret-id "${ENV_SECRET_ARN}" \
-            --query SecretString --output text \
-            | jq -r 'to_entries | .[] | "\(.key)=\(.value)"' > .env
 
       - name: Set release version
         id: set-release-version
@@ -322,6 +338,13 @@ jobs:
             echo "BUILD_REQUIRED=true" >> "$GITHUB_ENV"
           fi
 
+      - name: Configure AWS Credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        if: env.BUILD_REQUIRED == 'true'
+        with:
+          role-to-assume: ${{ secrets.OIDC_AWS_DEPLOY_ROLE_ARN_INFRA }}
+          aws-region: ${{ secrets.OIDC_AWS_REGION_INFRA }}
+
       - name: Configure AWS Credentials (OIDC) - Shared
         uses: aws-actions/configure-aws-credentials@v4
         if: env.BUILD_REQUIRED == 'true'
@@ -344,21 +367,30 @@ jobs:
         run: |
           docker pull 170071165762.dkr.ecr.us-east-2.amazonaws.com/cor-shared-us-east-2-ms-web-base:latest
 
-      - name: Configure AWS Credentials for artifact upload
+      - name: Configure AWS Credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        if: env.BUILD_REQUIRED == 'true'
+        with:
+          role-to-assume: ${{ secrets.OIDC_AWS_DEPLOY_ROLE_ARN_INFRA }}
+          aws-region: ${{ secrets.OIDC_AWS_REGION_INFRA }}
+
+      - name: Configure AWS Credentials for artifact upload (OIDC) - Staging
         if: env.BUILD_REQUIRED == 'true' && contains(inputs.stage, 'staging')
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.STG_AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.STG_AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.STG_AWS_REGION }}
+          role-to-assume: ${{ vars.AWS_GITHUB_OIDC_ROLE_STG }}
+          aws-region: ${{ vars.AWS_GITHUB_OIDC_REGION_STG }}
+          role-chaining: true
+          role-skip-session-tagging: true
 
-      - name: Configure AWS Credentials for artifact upload
+      - name: Configure AWS Credentials for artifact upload (OIDC) - Production
         if: env.BUILD_REQUIRED == 'true' && (contains(fromJSON('["production", "beta"]'), inputs.stage) || inputs.stage == '')
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.PROD_AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.PROD_AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.PROD_AWS_REGION }}
+          role-to-assume: ${{ vars.AWS_GITHUB_OIDC_ROLE_PROD }}
+          aws-region: ${{ vars.AWS_GITHUB_OIDC_REGION_PROD }}
+          role-chaining: true
+          role-skip-session-tagging: true
 
       - name: Build artifacts with Docker and upload to S3
         if: env.BUILD_REQUIRED == 'true'
