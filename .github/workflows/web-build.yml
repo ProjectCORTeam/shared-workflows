@@ -223,7 +223,7 @@ jobs:
       - name: Sync environment variables 
         id: sync-environment-variables
         run: |
-          ENV_SECRET_ARN="$${{ varss.env_secret_arn }}"
+          ENV_SECRET_ARN="${{ vars.env_secret_arn }}"
           if [[ -z "${ENV_SECRET_ARN}" ]]; then
             echo "ERROR: vars.env_secret_arn is empty."
             echo "Configure the variable 'env_secret_arn' in GitHub Environment '${{ inputs.stage }}' (repo Web, not shared-workflows)."

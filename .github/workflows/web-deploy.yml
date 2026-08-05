@@ -38,9 +38,9 @@ jobs:
       name: ${{ inputs.stage }}
     name: AWS CodeDeploy Deploy
     env:
-      CODEDEPLOY_APP_NAME: $${{ varss.CODEDEPLOY_APP_NAME }}
-      CODEDEPLOY_DEPLOYMENT_GROUP: $${{ varss.CODEDEPLOY_DEPLOYMENT_GROUP }}
-      CODEDEPLOY_S3_ARTIFACTS: $${{ varss.CODEDEPLOY_S3_ARTIFACTS }}
+      CODEDEPLOY_APP_NAME: ${{ vars.CODEDEPLOY_APP_NAME }}
+      CODEDEPLOY_DEPLOYMENT_GROUP: ${{ vars.CODEDEPLOY_DEPLOYMENT_GROUP }}
+      CODEDEPLOY_S3_ARTIFACTS: ${{ vars.CODEDEPLOY_S3_ARTIFACTS }}
       ARTIFACT_S3_KEY: ${{ inputs.artifact_s3_key }}
     steps:
       - name: Validate environment variables
