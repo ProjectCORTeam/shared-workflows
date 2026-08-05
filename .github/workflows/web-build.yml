@@ -55,6 +55,10 @@ on:
         required: true
         description: "Private NPM token"
 
+permissions:
+  id-token: write
+  contents: read
+
 env:
   NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
