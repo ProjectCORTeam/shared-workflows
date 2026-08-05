@@ -38,9 +38,9 @@ jobs:
       name: ${{ inputs.stage }}
     name: AWS CodeDeploy Deploy
     env:
-      CODEDEPLOY_APP_NAME: ${{ vars.CODEDEPLOY_APP_NAME }}
-      CODEDEPLOY_DEPLOYMENT_GROUP: ${{ vars.CODEDEPLOY_DEPLOYMENT_GROUP }}
-      CODEDEPLOY_S3_ARTIFACTS: ${{ vars.CODEDEPLOY_S3_ARTIFACTS }}
+      CODEDEPLOY_APP_NAME: $${{ varss.CODEDEPLOY_APP_NAME }}
+      CODEDEPLOY_DEPLOYMENT_GROUP: $${{ varss.CODEDEPLOY_DEPLOYMENT_GROUP }}
+      CODEDEPLOY_S3_ARTIFACTS: $${{ varss.CODEDEPLOY_S3_ARTIFACTS }}
       ARTIFACT_S3_KEY: ${{ inputs.artifact_s3_key }}
     steps:
       - name: Validate environment variables
@@ -56,15 +56,15 @@ jobs:
       - name: Configure AWS Credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: {{ secrets.OIDC_AWS_DEPLOY_ROLE_ARN_INFRA }}
-          aws-region: {{ secrets.OIDC_AWS_REGION_INFRA }}
+          role-to-assume: ${{ secrets.OIDC_AWS_DEPLOY_ROLE_ARN_INFRA }}
+          aws-region: ${{ secrets.OIDC_AWS_REGION_INFRA }}
 
       - name: Configure AWS Credentials (OIDC) - Staging
         uses: aws-actions/configure-aws-credentials@v4
         if: ${{ contains(inputs.stage, 'staging') }}
         with:
-          role-to-assume: {{ var.AWS_GITHUB_OIDC_ROLE_STG }}
-          aws-region: {{ var.AWS_GITHUB_OIDC_REGION_STG }}
+          role-to-assume: ${{ vars.AWS_GITHUB_OIDC_ROLE_STG }}
+          aws-region: ${{ vars.AWS_GITHUB_OIDC_REGION_STG }}
           role-chaining: true
           role-skip-session-tagging: true
 
@@ -72,8 +72,8 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         if: ${{ contains(fromJSON('["production", "beta"]'), inputs.stage) }}
         with:
-          role-to-assume: {{ var.AWS_GITHUB_OIDC_ROLE_PROD }}
-          aws-region: {{ var.AWS_GITHUB_OIDC_REGION_PROD }}
+          role-to-assume: ${{ vars.AWS_GITHUB_OIDC_ROLE_PROD }}
+          aws-region: ${{ vars.AWS_GITHUB_OIDC_REGION_PROD }}
           role-chaining: true
           role-skip-session-tagging: true
 
