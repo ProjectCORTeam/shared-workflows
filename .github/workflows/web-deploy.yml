@@ -23,29 +23,9 @@ on:
         description: "Enable notifications to cloud or team owner flag"
       
     secrets: 
-      AWS_ACCESS_KEY_ID:
+      OIDC_AWS_DEPLOY_ROLE_ARN_INFRA:
         required: true
-      AWS_SECRET_ACCESS_KEY:
-        required: true
-      AWS_REGION:
-        required: true
-      STG_AWS_ACCESS_KEY_ID:
-        required: true
-      STG_AWS_SECRET_ACCESS_KEY:
-        required: true
-      STG_AWS_REGION:
-        required: true
-      PROD_AWS_ACCESS_KEY_ID:
-        required: true
-      PROD_AWS_SECRET_ACCESS_KEY:
-        required: true
-      PROD_AWS_REGION:
-        required: true
-      SHARED_AWS_ACCESS_KEY_ID:
-        required: true
-      SHARED_AWS_SECRET_ACCESS_KEY:
-        required: true
-      SHARED_AWS_REGION:
+      OIDC_AWS_REGION_INFRA:
         required: true
       GOOGLE_WEBHOOK:
         required: true
@@ -73,21 +53,29 @@ jobs:
             exit 1
           fi
 
-      - name: Configure AWS Credentials
-        if: ${{ contains(fromJSON('["production", "beta"]'), vars.CODEDEPLOY_DEPLOYMENT_GROUP) }}
+      - name: Configure AWS Credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          role-to-assume: {{ secrets.OIDC_AWS_DEPLOY_ROLE_ARN_INFRA }}
+          aws-region: {{ secrets.OIDC_AWS_REGION_INFRA }}
 
-      - name: Configure AWS Credentials
-        if: ${{ startsWith(vars.CODEDEPLOY_DEPLOYMENT_GROUP, 'stg') }}
+      - name: Configure AWS Credentials (OIDC) - Staging
         uses: aws-actions/configure-aws-credentials@v4
+        if: ${{ contains(inputs.stage, 'staging') }}
         with:
-          aws-access-key-id: ${{ secrets.STG_AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.STG_AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.STG_AWS_REGION }}
+          role-to-assume: {{ var.AWS_GITHUB_OIDC_ROLE_STG }}
+          aws-region: {{ var.AWS_GITHUB_OIDC_REGION_STG }}
+          role-chaining: true
+          role-skip-session-tagging: true
+
+      - name: Configure AWS Credentials (OIDC) - Production
+        uses: aws-actions/configure-aws-credentials@v4
+        if: ${{ contains(fromJSON('["production", "beta"]'), inputs.stage) }}
+        with:
+          role-to-assume: {{ var.AWS_GITHUB_OIDC_ROLE_PROD }}
+          aws-region: {{ var.AWS_GITHUB_OIDC_REGION_PROD }}
+          role-chaining: true
+          role-skip-session-tagging: true
 
       - name: Trigger AWS CodeDeploy
         id: codedeploy

@@ -38,23 +38,9 @@ on:
         value: ${{ jobs.build-push.outputs.ARTIFACT_S3_KEY }}
     
     secrets: 
-      AWS_ACCESS_KEY_ID:
+      OIDC_AWS_DEPLOY_ROLE_ARN_INFRA:
         required: true
-      AWS_SECRET_ACCESS_KEY:
-        required: true
-      AWS_REGION:
-        required: true
-      PROD_AWS_ACCESS_KEY_ID:
-        required: true
-      PROD_AWS_SECRET_ACCESS_KEY:
-        required: true
-      PROD_AWS_REGION:
-        required: true
-      SHARED_AWS_ACCESS_KEY_ID:
-        required: true
-      SHARED_AWS_SECRET_ACCESS_KEY:
-        required: true
-      SHARED_AWS_REGION:
+      OIDC_AWS_REGION_INFRA:
         required: true
       GOOGLE_WEBHOOK:
         required: true
@@ -209,22 +195,30 @@ jobs:
               echo "✓ AWS CLI instalado"
               aws --version
           fi
-      
-      - name: Configure AWS Credentials - STG
-        if: ${{ contains(inputs.stage, 'staging') }}
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.STG_AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.STG_AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.STG_AWS_REGION }}
 
-      - name: Configure AWS Credentials - PROD
-        if: ${{ contains(fromJSON('["production", "beta"]'), inputs.stage) }}
+      - name: Configure AWS Credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          role-to-assume: {{ secrets.OIDC_AWS_DEPLOY_ROLE_ARN_INFRA }}
+          aws-region: {{ secrets.OIDC_AWS_REGION_INFRA }}
+
+      - name: Configure AWS Credentials (OIDC) - Staging
+        uses: aws-actions/configure-aws-credentials@v4
+        if: ${{ contains(inputs.stage, 'staging') }}
+        with:
+          role-to-assume: {{ var.AWS_GITHUB_OIDC_ROLE_STG }}
+          aws-region: {{ var.AWS_GITHUB_OIDC_REGION_STG }}
+          role-chaining: true
+          role-skip-session-tagging: true
+
+      - name: Configure AWS Credentials (OIDC) - Production
+        uses: aws-actions/configure-aws-credentials@v4
+        if: ${{ contains(fromJSON('["production", "beta"]'), inputs.stage) }}
+        with:
+          role-to-assume: {{ var.AWS_GITHUB_OIDC_ROLE_PROD }}
+          aws-region: {{ var.AWS_GITHUB_OIDC_REGION_PROD }}
+          role-chaining: true
+          role-skip-session-tagging: true
       
       - name: Sync environment variables 
         id: sync-environment-variables
@@ -324,13 +318,14 @@ jobs:
             echo "BUILD_REQUIRED=true" >> "$GITHUB_ENV"
           fi
 
-      - name: Configure AWS Credentials - Shared (for ECR)
-        if: env.BUILD_REQUIRED == 'true'
+      - name: Configure AWS Credentials (OIDC) - Shared
         uses: aws-actions/configure-aws-credentials@v4
+        if: env.BUILD_REQUIRED == 'true'
         with:
-          aws-access-key-id: ${{ secrets.SHARED_AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.SHARED_AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.SHARED_AWS_REGION }}
+          role-to-assume: {{ var.AWS_GITHUB_OIDC_ROLE_SHARED }}
+          aws-region: {{ var.AWS_GITHUB_OIDC_REGION_SHARED }}
+          role-chaining: true
+          role-skip-session-tagging: true
 
       - name: Login to Amazon ECR
         if: env.BUILD_REQUIRED == 'true'
