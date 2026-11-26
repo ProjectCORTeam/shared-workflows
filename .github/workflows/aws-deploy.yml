@@ -137,7 +137,7 @@ jobs:
           SERVICE_TYPE=$(jq -r '.type' infra-config/.infra/infra-config.json | tr '[:upper:]' '[:lower:]')
           
           # Configurar el nombre del namespace
-          if [[ "$STAGE_INPUT" =~ ^staging([1-9]|10)$ ]]; then
+          if [[ "$STAGE_INPUT" =~ ^staging[1-9][0-9]*$ ]]; then
             K8S_NAMESPACE="${STAGE_INPUT/staging/staging-}"
           else
             K8S_NAMESPACE="$STAGE_INPUT"
