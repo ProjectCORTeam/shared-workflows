@@ -192,7 +192,7 @@ jobs:
               echo "STAGE_SHORT=$STAGE_INPUT" >> $GITHUB_OUTPUT
             fi
           else
-            if [[ "$STAGE_INPUT" =~ ^staging([1-9]|10)?$ ]]; then
+            if [[ "$STAGE_INPUT" =~ ^staging([1-9][0-9]*)?$ ]]; then
               STAGE=${STAGE_INPUT/staging/}
               echo "ENVIRONMENT=staging" >> $GITHUB_ENV
               echo "STAGE=$STAGE_INPUT" >> $GITHUB_ENV
